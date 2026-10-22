@@ -63,7 +63,7 @@ fun GoScreen(alert: Alert, onBack: () -> Unit, onTurnOnLocation: () -> Unit, onR
     Page {
         BackBar(alert.node, "${alert.level.lowercase().replaceFirstChar { it.uppercase() }} · since ${ago(alert.since)}", onBack = onBack)
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            AndroidView(Modifier.fillMaxSize(), factory = { c ->
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { c ->
                 Configuration.getInstance().apply {
                     load(c, c.getSharedPreferences("osm", Context.MODE_PRIVATE)); userAgentValue = c.packageName
                     osmdroidBasePath = File(c.cacheDir, "osm"); osmdroidTileCache = File(c.cacheDir, "osm/tiles")
