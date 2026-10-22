@@ -91,7 +91,7 @@ fun App() {
             !registered -> Register { registered = true }
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { chat = null; review = false }
             chat != null -> key(startStep) { Chat(chat!!, draft, startStep, onClose = { chat = null }, onReview = { review = true }, onTurnOnLocation = { askLocation(true) }) }
-            else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a }, onReplay = { splash = true })
+            else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a })
         }
     }
 }

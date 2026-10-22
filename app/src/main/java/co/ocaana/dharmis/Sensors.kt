@@ -43,13 +43,12 @@ object Loc {
         for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
             try {
                 lm.requestLocationUpdates(p, 5000L, 0f, l, Looper.getMainLooper())
-                lm.getLastKnownLocation(p)?.let { k -> if (last.value == null || k.time > last.value!!.time) last.value = k }
             } catch (_: Exception) { }
         }
     }
 
-    /** A fix from the last 5 minutes, or null. */
-    fun fresh(): Location? = last.value?.takeIf { System.currentTimeMillis() - it.time < 300_000 }
+    /** A live fix: the location switch is on and the fix is under 20 seconds old. Never an old position. */
+    fun fresh(): Location? = last.value?.takeIf { on.value && (android.os.SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) < 20_000_000_000L }
 }
 
 fun hasCompass(ctx: Context): Boolean =

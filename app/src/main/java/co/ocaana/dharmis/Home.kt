@@ -31,7 +31,7 @@ fun ago(t: Long): String {
 fun stamp(t: Long): String = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(t))
 
 @Composable
-fun Home(onReport: (Alert) -> Unit, onReplay: () -> Unit) {
+fun Home(onReport: (Alert) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = open != null) { open = null }
@@ -41,7 +41,7 @@ fun Home(onReport: (Alert) -> Unit, onReplay: () -> Unit) {
             when (tab) {
                 0 -> Alerts(onReport)
                 1 -> Reports { open = it }
-                else -> Me(onReplay)
+                else -> Me()
             }
         }
         Row(Modifier.fillMaxWidth().background(pal.card).padding(vertical = 6.dp)) {
@@ -69,6 +69,7 @@ private fun Alerts(onReport: (Alert) -> Unit) {
             Column(Modifier.weight(1f)) { T("Alerts", 26, FontWeight.ExtraBold); T(p?.station ?: "", 13, FontWeight.Medium, pal.ink3) }
             Pill(if (duty) "On duty" else "Off duty", if (duty) pal.grn2 else pal.card2, if (duty) pal.grn else pal.ink3)
         }
+        DutyRow()
         if (!duty) {
             Card(Modifier.fillMaxWidth(), pad = 24.dp) {
                 Icon(Icons.Rounded.NotificationsOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
@@ -152,9 +153,17 @@ private fun ReportDetail(id: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Me(onReplay: () -> Unit) {
-    val p = Store.profile.value ?: return
+private fun DutyRow() {
     val duty by Store.onDuty
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(pal.card).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) { T("On duty", 17, FontWeight.Bold); T(if (duty) "You receive alerts" else "No alerts at all", 13, FontWeight.Medium, pal.ink3) }
+        Switch(duty, { Store.setDuty(it) }, colors = SwitchDefaults.colors(checkedTrackColor = pal.pri))
+    }
+}
+
+@Composable
+private fun Me() {
+    val p = Store.profile.value ?: return
     val mode by Store.themeMode
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         T("Me", 26, FontWeight.ExtraBold)
@@ -166,14 +175,10 @@ private fun Me(onReplay: () -> Unit) {
             T("${p.range.division} · ${p.range.circle}", 13, FontWeight.Medium, pal.ink3)
             T("+91 ${p.phone}", 13, FontWeight.Medium, pal.ink3)
         }
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(pal.card).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { T("On duty", 17, FontWeight.Bold); T(if (duty) "You receive alerts" else "No alerts at all", 13, FontWeight.Medium, pal.ink3) }
-            Switch(duty, { Store.setDuty(it) }, colors = SwitchDefaults.colors(checkedTrackColor = pal.pri))
-        }
+        DutyRow()
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
         Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
         T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)
-        BigButton("Replay startup animation", Icons.Rounded.PlayArrow, 1, Modifier.fillMaxWidth(), onClick = onReplay)
         T("DharmIS 0.1 · OCAANA", 12, FontWeight.Medium, pal.ink3)
     }
 }

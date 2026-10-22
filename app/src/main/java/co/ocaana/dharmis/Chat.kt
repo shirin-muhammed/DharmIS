@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import java.io.File
@@ -62,7 +63,7 @@ val SEEN = listOf(
 )
 val SECTORS = mapOf("N" to 0, "NE" to 45, "E" to 90, "SE" to 135, "S" to 180, "SW" to 225, "W" to 270, "NW" to 315)
 val ACTIVITIES = listOf("Standing in forest", "Walking to village", "In crop field", "Crossing road", "Calves with herd", "Aggressive")
-val DIST_BANDS = listOf("Under 100 m" to 50, "100–300 m" to 200, "300 m – 1 km" to 650, "Over 1 km" to 1500)
+val DIST_BANDS = listOf("Under 100 m" to 50, "100–300 m" to 200, "300 m – 1 km" to 650)
 
 fun compressPhoto(src: File, dst: File): Boolean {
     return try {
@@ -100,8 +101,11 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
     var measuring by remember { mutableStateOf(false) }
     val compass = remember { hasCompass(ctx) }
     val heading by rememberHeading(measuring)
-    val loc by Loc.last
-    val gpsDist: Float? = Loc.fresh()?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
+    // Re-check every 2 s so a switched-off GPS or an old fix never counts as live.
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { Loc.on.value = Loc.enabled(ctx); tick++; kotlinx.coroutines.delay(2000) } }
+    var typed by remember { mutableStateOf("") }
+    val gpsDist: Float? = run { tick; Loc.fresh() }?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
     BackHandler { if (step > 0) step-- else onClose() }
 
     val photoFile = remember { File(ctx.cacheDir, "shots").apply { mkdirs() }.let { File(it, "shot.jpg") } }
@@ -149,7 +153,10 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
             if (step >= 2) Bubble("${draft.herd} · ${draft.calves} calves · ${draft.tuskers} tusker${if (draft.tuskers == 1) "" else "s"}", true)
             if (step >= 2) Bubble("Which way are they moving?", false)
             if (step >= 3) Bubble(draft.direction ?: "Not sure", true)
-            if (step >= 3) Bubble(if (gpsDist != null && distRight != false) "You are about ${kmText(gpsDist)} from ${alert.node} (GPS). Right?" else "How far are they from ${alert.node}?", false)
+            if (step >= 3) Bubble(
+                if (step == 3 && gpsDist != null && distRight != false) "You are about ${kmText(gpsDist)} from ${alert.node} (GPS). Right?"
+                else if (step >= 4 && draft.distanceLabel.endsWith("(GPS)")) "How far are you from ${alert.node}?"
+                else "How far are they from ${alert.node}?", false)
             if (step >= 4) Bubble(draft.distanceLabel, true)
             if (step >= 4) Bubble("What are they doing?", false)
             if (step >= 5) Bubble(draft.activity.joinToString(", ").ifEmpty { "Not sure" }, true)
@@ -219,7 +226,7 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                 }
                 3 -> {
                     if (gpsDist != null && distRight != false) {
-                        T("From your phone GPS", 13, FontWeight.Bold, pal.ink3)
+                        T("From your phone GPS, live", 13, FontWeight.Bold, pal.ink3)
                         BigButton("Yes, about ${kmText(gpsDist)}", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) { draft.distance = gpsDist.toInt(); draft.distanceLabel = "About ${kmText(gpsDist)} (GPS)"; step = 4 }
                         BigButton("Not right, I will pick", null, 1, Modifier.fillMaxWidth()) { distRight = false }
                     } else {
@@ -230,9 +237,12 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                                 Spacer(Modifier.height(8.dp))
                                 BigButton(if (Loc.on.value) "Check again" else "Turn on location", Icons.Rounded.MyLocation, modifier = Modifier.fillMaxWidth(), onClick = onTurnOnLocation)
                             }
-                        }
+                        } else BigButton("Use my live GPS instead (about ${kmText(gpsDist)})", Icons.Rounded.MyLocation, 1, Modifier.fillMaxWidth()) { distRight = null }
                         T("Or pick how far they are", 13, FontWeight.Bold, pal.ink3)
                         DIST_BANDS.forEach { (l, m) -> OptionRow(l, null, Icons.Rounded.Place, draft.distanceLabel == l) { draft.distance = m; draft.distanceLabel = l; step = 4 } }
+                        T("Farther? Type the metres", 13, FontWeight.Bold, pal.ink3)
+                        TextBox(typed, "Distance in metres", null, KeyboardType.Number) { typed = it.filter(Char::isDigit).take(6) }
+                        BigButton("Use ${typed.ifEmpty { "this" }} m", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = (typed.toIntOrNull() ?: 0) > 0) { val n = typed.toInt(); draft.distance = n; draft.distanceLabel = "$n m"; step = 4 }
                     }
                 }
                 4 -> {
