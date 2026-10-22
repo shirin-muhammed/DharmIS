@@ -63,6 +63,10 @@ object Store {
     fun setDuty(on: Boolean) { onDuty.value = on; sp.edit().putBoolean("duty", on).apply() }
     fun setTheme(m: Int) { themeMode.value = m; sp.edit().putInt("theme", m).apply() }
 
+    /** Language the voice note listens for: ml-IN or en-IN. */
+    val voiceLang get() = sp.getString("voiceLang", "ml-IN")!!
+    fun setVoiceLang(tag: String) { sp.edit().putString("voiceLang", tag).apply() }
+
     fun add(r: Report) { reports.add(0, r); persist() }
 
     /** A correction is added under the report; the original text is never changed. */

@@ -70,9 +70,17 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { T("Alerts", 26, FontWeight.ExtraBold); T(p?.station ?: "", 13, FontWeight.Medium, pal.ink3) }
-            Pill(if (duty) "On duty" else "Off duty", if (duty) pal.grn2 else pal.card2, if (duty) pal.grn else pal.ink3)
+            // Tap to go on or off duty.
+            val on = duty
+            Row(
+                Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).background(if (on) pal.grn2 else pal.card2).clickable { Store.setDuty(!on) }.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(if (on) pal.grn else pal.ink3))
+                Spacer(Modifier.width(8.dp))
+                T(if (on) "On duty" else "Off duty", 15, FontWeight.ExtraBold, if (on) pal.grn else pal.ink3)
+            }
         }
-        DutyRow()
         if (!duty) {
             Card(Modifier.fillMaxWidth(), pad = 24.dp) {
                 Icon(Icons.Rounded.NotificationsOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))

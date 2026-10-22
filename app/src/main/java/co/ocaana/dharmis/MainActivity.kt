@@ -88,14 +88,16 @@ fun App() {
         val draft = remember { Draft() }
         var startStep by remember { mutableIntStateOf(0) }
         var go by remember { mutableStateOf<Alert?>(null) }
+        var sentId by remember { mutableStateOf<String?>(null) }
         // GPS runs only while a report or the Go map is open.
         val needsLoc = chat != null || go != null
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         when {
             splash -> Splash { splash = false }
             !registered -> Register { registered = true }
+            sentId != null -> Sent(sentId!!) { sentId = null }
             go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })
-            chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { chat = null; review = false }
+            chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { id -> sentId = id; chat = null; review = false }
             chat != null -> key(startStep) { Chat(chat!!, draft, startStep, onClose = { chat = null }, onReview = { review = true }, onTurnOnLocation = { askLocation(true) }) }
             else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a }, onGo = { a -> go = a })
         }

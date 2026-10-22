@@ -124,14 +124,17 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
         }
     }
 
-    fun speak(tag: String) {
+    var voiceLang by remember { mutableStateOf(Store.voiceLang) }
+    fun speak() {
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(ctx)) {
+            Toast.makeText(ctx, "Voice typing needs the Google app. Install or update it from Play Store, or type the note.", Toast.LENGTH_LONG).show(); return
+        }
+        val tag = voiceLang
         try {
-            val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag).putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, if (tag == "ml-IN") "എന്താണ് പറയാനുള്ളത്?" else "Say anything we should know")
-            if (tag != "ml-IN") i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            speech.launch(i)
-        } catch (_: ActivityNotFoundException) { Toast.makeText(ctx, "Speech input is not available on this phone. Type the note instead.", Toast.LENGTH_LONG).show() }
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, if (tag == "ml-IN") "എന്താണ് പറയാനുള്ളത്?" else "Say anything we should know"))
+        } catch (_: ActivityNotFoundException) { Toast.makeText(ctx, "Voice typing is not available on this phone. Type the note instead.", Toast.LENGTH_LONG).show() }
     }
 
     Page {
@@ -254,10 +257,15 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     OptionRow(if (draft.photoId == null) "Add a photo" else "Photo added · ${draft.photoKb} KB", "Saved small, about 40–150 KB", Icons.Rounded.CameraAlt, draft.photoId != null) {
                         try { camera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", photoFile)) } catch (_: Exception) { Toast.makeText(ctx, "No camera available", Toast.LENGTH_SHORT).show() }
                     }
-                    T(if (draft.note.isBlank()) "Add a voice note: tap the language you will speak" else "Voice note added. You can fix the text below.", 13, FontWeight.Bold, pal.ink3)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BigButton("മലയാളം", Icons.Rounded.Mic, 1, Modifier.weight(1f)) { speak("ml-IN") }
-                        BigButton("English", Icons.Rounded.Mic, 1, Modifier.weight(1f)) { speak("en-IN") }
+                    // One mic control. The mic speaks in the chosen language; the chip beside it switches between Malayalam and English.
+                    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).clip(RoundedCornerShape(18.dp)).background(if (draft.note.isNotBlank()) pal.pri2 else pal.card).border(BorderStroke(if (draft.note.isNotBlank()) 2.dp else 1.dp, if (draft.note.isNotBlank()) pal.pri else pal.line), RoundedCornerShape(18.dp)), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.weight(1f).clickable { speak() }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Mic, null, tint = pal.pri, modifier = Modifier.size(26.dp)); Spacer(Modifier.width(12.dp))
+                            Column { T(if (draft.note.isBlank()) "Voice note" else "Voice note added", 17, FontWeight.Bold); T("Tap and speak in ${if (voiceLang == "ml-IN") "Malayalam" else "English"}", 13, FontWeight.Normal, pal.ink3) }
+                        }
+                        Box(Modifier.padding(end = 10.dp).height(40.dp).clip(RoundedCornerShape(20.dp)).background(pal.bg).border(BorderStroke(1.dp, pal.line), RoundedCornerShape(20.dp)).clickable { Store.setVoiceLang(if (voiceLang == "ml-IN") "en-IN" else "ml-IN"); voiceLang = Store.voiceLang }.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+                            T(if (voiceLang == "ml-IN") "മലയാളം ⇄ EN" else "EN ⇄ മലയാളം", 13, FontWeight.ExtraBold, pal.ink)
+                        }
                     }
                     T("Note (optional, tap to type or fix the text)", 13, FontWeight.Bold, pal.ink3)
                     TextBox(draft.note, "Anything else we should know") { draft.note = it }
