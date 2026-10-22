@@ -23,6 +23,9 @@ object Loc {
     /** True while the phone's location switch is on. */
     val on = mutableStateOf(false)
     private var listener: LocationListener? = null
+    /** True while a screen needs location; the app re-registers after coming back from the background. */
+    var wanted = false
+        private set
 
     fun enabled(ctx: Context): Boolean {
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -32,6 +35,7 @@ object Loc {
     /** Safe to call again after permission is granted or location is switched on. */
     @SuppressLint("MissingPermission")
     fun start(ctx: Context) {
+        wanted = true
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         on.value = enabled(ctx)
         val l = listener ?: object : LocationListener {
@@ -46,6 +50,17 @@ object Loc {
             } catch (_: Exception) { }
         }
     }
+
+    private fun unregister(ctx: Context) {
+        listener?.let { (ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager).removeUpdates(it) }
+        listener = null
+    }
+
+    /** Background: stop listening but remember that a screen still wants location. */
+    fun pause(ctx: Context) = unregister(ctx)
+
+    /** Nothing needs location any more: stop listening and forget the last position. */
+    fun stop(ctx: Context) { wanted = false; unregister(ctx); last.value = null }
 
     /** A live fix: the location switch is on and the fix is under 20 seconds old. Never an old position. */
     fun fresh(): Location? = last.value?.takeIf { on.value && (android.os.SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) < 20_000_000_000L }

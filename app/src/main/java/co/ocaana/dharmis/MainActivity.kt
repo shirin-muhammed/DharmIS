@@ -17,7 +17,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 
@@ -30,25 +29,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) Loc.start(this)
+        if (Loc.wanted) Loc.start(this)
         Api.syncPending()
+    }
+
+    // Location is only ever on while a report or the Go map is open, and not while the app is in the background.
+    override fun onPause() {
+        super.onPause()
+        Loc.pause(this)
     }
 }
 
 @Composable
 fun App() {
     val ctx = LocalContext.current
-    val loc by Loc.last
     val mode by Store.themeMode
-    val system = isSystemInDarkTheme()
     // Re-check every minute so the switch at sunset happens while the app is open.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60_000); now = System.currentTimeMillis() } }
     val dark = when (mode) {
         1 -> false
         2 -> true
-        else -> loc?.let { isNight(it.latitude, it.longitude, now) } ?: system
+        else -> isNight(10.5, 76.5, now) // Kerala; the sunset time varies by only a few minutes across the state, so no GPS is needed
     }
 
     // Shows the system "Turn on location" dialog; phones without Google services get the Location settings page.
@@ -77,7 +79,6 @@ fun App() {
         val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION).any { ContextCompat.checkSelfPermission(ctx, it) == PackageManager.PERMISSION_GRANTED }
         if (granted) turnOnLocation() else perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
-    LaunchedEffect(Unit) { askLocation(false) }
 
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
@@ -86,12 +87,17 @@ fun App() {
         var registered by remember { mutableStateOf(Store.profile.value != null) }
         val draft = remember { Draft() }
         var startStep by remember { mutableIntStateOf(0) }
+        var go by remember { mutableStateOf<Alert?>(null) }
+        // GPS runs only while a report or the Go map is open.
+        val needsLoc = chat != null || go != null
+        LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         when {
             splash -> Splash { splash = false }
             !registered -> Register { registered = true }
+            go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { chat = null; review = false }
             chat != null -> key(startStep) { Chat(chat!!, draft, startStep, onClose = { chat = null }, onReview = { review = true }, onTurnOnLocation = { askLocation(true) }) }
-            else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a })
+            else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a }, onGo = { a -> go = a })
         }
     }
 }

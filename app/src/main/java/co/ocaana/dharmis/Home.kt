@@ -31,7 +31,7 @@ fun ago(t: Long): String {
 fun stamp(t: Long): String = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(t))
 
 @Composable
-fun Home(onReport: (Alert) -> Unit) {
+fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = open != null) { open = null }
@@ -39,7 +39,7 @@ fun Home(onReport: (Alert) -> Unit) {
     Page {
         Box(Modifier.weight(1f)) {
             when (tab) {
-                0 -> Alerts(onReport)
+                0 -> Alerts(onReport, onGo)
                 1 -> Reports { open = it }
                 else -> Me()
             }
@@ -61,7 +61,7 @@ private fun NavItem(label: String, icon: ImageVector, on: Boolean, modifier: Mod
 }
 
 @Composable
-private fun Alerts(onReport: (Alert) -> Unit) {
+private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     val duty by Store.onDuty
     val p = Store.profile.value
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -92,7 +92,10 @@ private fun Alerts(onReport: (Alert) -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 T("Example alert. Live alerts start once your office connects DharmIS to the control room.", 12, FontWeight.Bold, pal.ink3)
                 Spacer(Modifier.height(14.dp))
-                BigButton("Report elephants", Icons.Rounded.Campaign, 2, Modifier.fillMaxWidth()) { onReport(a) }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BigButton("Go", Icons.Rounded.Navigation, 1, Modifier.weight(1f)) { onGo(a) }
+                    BigButton("Report now", Icons.Rounded.Edit, 2, Modifier.weight(2f)) { onReport(a) }
+                }
             }
             T("No other alerts", 14, FontWeight.Medium, pal.ink3)
         }
