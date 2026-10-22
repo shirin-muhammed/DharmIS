@@ -1,6 +1,9 @@
 package co.ocaana.dharmis
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -166,6 +169,7 @@ private fun DutyRow() {
 
 @Composable
 private fun Me() {
+    val ctx = LocalContext.current
     val p = Store.profile.value ?: return
     val mode by Store.themeMode
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -177,6 +181,9 @@ private fun Me() {
             T("${p.station} · ${p.range.name}", 14, FontWeight.Bold)
             T("${p.range.division} · ${p.range.circle}", 13, FontWeight.Medium, pal.ink3)
             T("+91 ${p.phone}", 13, FontWeight.Medium, pal.ink3)
+        }
+        if (p.range.phone.isNotBlank()) BigButton("Call the range office", Icons.Rounded.Call, 1, Modifier.fillMaxWidth()) {
+            ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.range.phone)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         DutyRow()
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
