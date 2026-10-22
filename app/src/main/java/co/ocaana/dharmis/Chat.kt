@@ -18,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,7 @@ class Draft {
     var calves by mutableIntStateOf(0)
     var tuskers by mutableIntStateOf(0)
     var direction by mutableStateOf<String?>(null)
+    var bearing by mutableStateOf<Int?>(null)
     var distance by mutableStateOf<Int?>(null)
     var distanceLabel by mutableStateOf("")
     var activity by mutableStateOf<Set<String>>(emptySet())
@@ -47,7 +50,7 @@ class Draft {
     var photoKb by mutableIntStateOf(0)
     var note by mutableStateOf("")
     val herd get() = adults + calves + tuskers
-    fun reset() { seen = null; adults = 0; calves = 0; tuskers = 0; direction = null; distance = null; distanceLabel = ""; activity = emptySet(); photoId = null; photoKb = 0; note = "" }
+    fun reset() { seen = null; adults = 0; calves = 0; tuskers = 0; direction = null; bearing = null; distance = null; distanceLabel = ""; activity = emptySet(); photoId = null; photoKb = 0; note = "" }
 }
 
 val SEEN = listOf(
@@ -57,6 +60,7 @@ val SEEN = listOf(
     Triple("Someone told me", "Not seen by me", Icons.Rounded.Person),
     Triple("No elephants here", "False alarm", Icons.Rounded.Close),
 )
+val SECTORS = mapOf("N" to 0, "NE" to 45, "E" to 90, "SE" to 135, "S" to 180, "SW" to 225, "W" to 270, "NW" to 315)
 val ACTIVITIES = listOf("Standing in forest", "Walking to village", "In crop field", "Crossing road", "Calves with herd", "Aggressive")
 val DIST_BANDS = listOf("Under 100 m" to 50, "100–300 m" to 200, "300 m – 1 km" to 650, "Over 1 km" to 1500)
 
@@ -89,14 +93,15 @@ fun Bubble(text: String, mine: Boolean) {
 }
 
 @Composable
-fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onReview: () -> Unit) {
+fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onReview: () -> Unit, onTurnOnLocation: () -> Unit) {
     val ctx = LocalContext.current
     var step by remember { mutableIntStateOf(startStep) }
     var distRight by remember { mutableStateOf<Boolean?>(null) }
     var measuring by remember { mutableStateOf(false) }
+    val compass = remember { hasCompass(ctx) }
     val heading by rememberHeading(measuring)
     val loc by Loc.last
-    val gpsDist: Float? = loc?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
+    val gpsDist: Float? = Loc.fresh()?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
     BackHandler { if (step > 0) step-- else onClose() }
 
     val photoFile = remember { File(ctx.cacheDir, "shots").apply { mkdirs() }.let { File(it, "shot.jpg") } }
@@ -113,6 +118,16 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
             val t = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!t.isNullOrBlank()) draft.note = if (draft.note.isBlank()) t else draft.note + " " + t
         }
+    }
+
+    fun speak(tag: String) {
+        try {
+            val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag).putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
+                .putExtra(RecognizerIntent.EXTRA_PROMPT, if (tag == "ml-IN") "എന്താണ് പറയാനുള്ളത്?" else "Say anything we should know")
+            if (tag != "ml-IN") i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            speech.launch(i)
+        } catch (_: ActivityNotFoundException) { Toast.makeText(ctx, "Speech input is not available on this phone. Type the note instead.", Toast.LENGTH_LONG).show() }
     }
 
     Page {
@@ -150,7 +165,7 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     SEEN.forEach { (t, s, ic) ->
                         OptionRow(t, s, ic, draft.seen == t) {
                             draft.seen = t
-                            if (t == "No elephants here") { draft.adults = 0; draft.calves = 0; draft.tuskers = 0; draft.direction = "Not sure"; draft.distance = null; draft.distanceLabel = "Not applicable"; onReview() } else step = 1
+                            if (t == "No elephants here") { draft.adults = 0; draft.calves = 0; draft.tuskers = 0; draft.direction = "Not sure"; draft.bearing = null; draft.distance = null; draft.distanceLabel = "Not applicable"; onReview() } else step = 1
                         }
                     }
                 }
@@ -169,21 +184,37 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     grid.forEach { row ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             row.forEach { d ->
-                                val on = draft.direction == d
-                                Box(
+                                val deg = SECTORS[d]
+                                val on = if (deg == null) draft.direction == d else draft.bearing != null && cardinal(draft.bearing!!.toDouble()) == d
+                                Column(
                                     Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(22.dp)).background(if (on) pal.pri else pal.bg).border(BorderStroke(1.dp, if (on) pal.pri else pal.line), RoundedCornerShape(22.dp))
-                                        .clickable { draft.direction = d; measuring = false }, contentAlignment = Alignment.Center,
-                                ) { T(d, if (d == "Not sure") 13 else 20, FontWeight.ExtraBold, if (on) pal.onPri else pal.ink) }
+                                        .clickable { measuring = false; if (deg == null) { draft.direction = d; draft.bearing = null } else { draft.bearing = deg; draft.direction = bearingText(deg) } },
+                                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                                ) {
+                                    T(d, if (deg == null) 13 else 20, FontWeight.ExtraBold, if (on) pal.onPri else pal.ink)
+                                    if (deg != null) T("$deg°", 12, FontWeight.Bold, if (on) pal.onPri else pal.ink3)
+                                }
                             }
                         }
                     }
                     if (measuring) {
                         val h = heading
                         Card(Modifier.fillMaxWidth(), bg = pal.pri2, border = pal.pri) {
-                            T(if (h == null) "Hold the phone upright and point the back at the elephants…" else "${cardinal(h.toDouble())} · ${h.toInt()}°", if (h == null) 14 else 22, FontWeight.ExtraBold, pal.pri)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(76.dp).clip(CircleShape).border(BorderStroke(2.dp, pal.pri), CircleShape), contentAlignment = Alignment.Center) {
+                                    T("N", 11, FontWeight.ExtraBold, pal.pri, Modifier.align(Alignment.TopCenter).padding(top = 2.dp))
+                                    Icon(Icons.Rounded.Navigation, null, tint = pal.pri, modifier = Modifier.size(34.dp).rotate(h ?: 0f))
+                                }
+                                Spacer(Modifier.width(14.dp))
+                                Column {
+                                    if (h == null) T("Hold the phone upright and point the back at the elephants…", 14, FontWeight.ExtraBold, pal.pri)
+                                    else { T("${cardinal(h.toDouble())} · ${h.toInt()}°", 26, FontWeight.ExtraBold, pal.pri); T("If it jumps, wave the phone in a figure 8", 12, FontWeight.Medium, pal.ink2) }
+                                }
+                            }
                         }
-                        BigButton("Use this direction", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = h != null) { draft.direction = cardinal(h!!.toDouble()); measuring = false }
-                    } else BigButton("Aim phone at them to measure", Icons.Rounded.Explore, 1, Modifier.fillMaxWidth()) { measuring = true }
+                        BigButton("Use this direction", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = h != null) { val d = h!!.toInt() % 360; draft.bearing = d; draft.direction = bearingText(d); measuring = false }
+                    } else if (compass) BigButton("Aim phone at them to measure", Icons.Rounded.Explore, 1, Modifier.fillMaxWidth()) { measuring = true }
+                    else T("This phone has no compass. Tap a direction.", 13, FontWeight.Medium, pal.ink3)
                     BigButton("Next", enabled = draft.direction != null, modifier = Modifier.fillMaxWidth()) { step = 3 }
                 }
                 3 -> {
@@ -192,7 +223,15 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                         BigButton("Yes, about ${kmText(gpsDist)}", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) { draft.distance = gpsDist.toInt(); draft.distanceLabel = "About ${kmText(gpsDist)} (GPS)"; step = 4 }
                         BigButton("Not right, I will pick", null, 1, Modifier.fillMaxWidth()) { distRight = false }
                     } else {
-                        T(if (gpsDist == null) "No GPS yet. Pick how far they are" else "Pick how far they are", 13, FontWeight.Bold, pal.ink3)
+                        if (gpsDist == null) {
+                            Card(Modifier.fillMaxWidth(), bg = pal.amb2, border = null) {
+                                T(if (Loc.on.value) "Finding your location…" else "Location is off on this phone", 15, FontWeight.ExtraBold, pal.amb)
+                                T("Switch it on to get the distance from ${alert.node} automatically.", 13, FontWeight.Medium, pal.ink2)
+                                Spacer(Modifier.height(8.dp))
+                                BigButton(if (Loc.on.value) "Check again" else "Turn on location", Icons.Rounded.MyLocation, modifier = Modifier.fillMaxWidth(), onClick = onTurnOnLocation)
+                            }
+                        }
+                        T("Or pick how far they are", 13, FontWeight.Bold, pal.ink3)
                         DIST_BANDS.forEach { (l, m) -> OptionRow(l, null, Icons.Rounded.Place, draft.distanceLabel == l) { draft.distance = m; draft.distanceLabel = l; step = 4 } }
                     }
                 }
@@ -205,10 +244,10 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     OptionRow(if (draft.photoId == null) "Add a photo" else "Photo added · ${draft.photoKb} KB", "Saved small, about 40–150 KB", Icons.Rounded.CameraAlt, draft.photoId != null) {
                         try { camera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", photoFile)) } catch (_: Exception) { Toast.makeText(ctx, "No camera available", Toast.LENGTH_SHORT).show() }
                     }
-                    OptionRow(if (draft.note.isBlank()) "Add a voice note" else "Voice note added", "Spoken, turned into text for you to check", Icons.Rounded.Mic, draft.note.isNotBlank()) {
-                        try {
-                            speech.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM).putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true).putExtra(RecognizerIntent.EXTRA_PROMPT, "Say anything we should know"))
-                        } catch (_: ActivityNotFoundException) { Toast.makeText(ctx, "Speech input is not available on this phone. Type the note instead.", Toast.LENGTH_LONG).show() }
+                    T(if (draft.note.isBlank()) "Add a voice note: tap the language you will speak" else "Voice note added. You can fix the text below.", 13, FontWeight.Bold, pal.ink3)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BigButton("മലയാളം", Icons.Rounded.Mic, 1, Modifier.weight(1f)) { speak("ml-IN") }
+                        BigButton("English", Icons.Rounded.Mic, 1, Modifier.weight(1f)) { speak("en-IN") }
                     }
                     T("Note (optional, tap to type or fix the text)", 13, FontWeight.Bold, pal.ink3)
                     TextBox(draft.note, "Anything else we should know") { draft.note = it }
@@ -252,7 +291,7 @@ fun Review(alert: Alert, draft: Draft, onChange: () -> Unit, onBack: () -> Unit,
         }
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             BigButton("Save and send", Icons.Rounded.Send, modifier = Modifier.fillMaxWidth()) {
-                val r = Report(UUID.randomUUID().toString(), System.currentTimeMillis(), alert.node, draft.seen ?: "", draft.adults, draft.calves, draft.tuskers, cardinalLabel(draft.direction), draft.activity.toList(), draft.distance, draft.photoId, draft.note.trim(), false, mutableListOf())
+                val r = Report(UUID.randomUUID().toString(), System.currentTimeMillis(), alert.node, draft.seen ?: "", draft.adults, draft.calves, draft.tuskers, cardinalLabel(draft.direction), draft.activity.toList(), draft.distance, draft.photoId, draft.note.trim(), false, mutableListOf(), draft.bearing)
                 Store.add(r); Api.syncPending(); onSaved(r.id)
             }
             BigButton("Change an answer", null, 1, Modifier.fillMaxWidth(), onClick = onChange)

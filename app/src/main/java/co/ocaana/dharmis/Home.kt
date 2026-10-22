@@ -31,7 +31,7 @@ fun ago(t: Long): String {
 fun stamp(t: Long): String = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault()).format(Date(t))
 
 @Composable
-fun Home(onReport: (Alert) -> Unit) {
+fun Home(onReport: (Alert) -> Unit, onReplay: () -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = open != null) { open = null }
@@ -41,7 +41,7 @@ fun Home(onReport: (Alert) -> Unit) {
             when (tab) {
                 0 -> Alerts(onReport)
                 1 -> Reports { open = it }
-                else -> Me()
+                else -> Me(onReplay)
             }
         }
         Row(Modifier.fillMaxWidth().background(pal.card).padding(vertical = 6.dp)) {
@@ -66,7 +66,7 @@ private fun Alerts(onReport: (Alert) -> Unit) {
     val p = Store.profile.value
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { T("DharmIS", 26, FontWeight.ExtraBold); T(p?.station ?: "", 13, FontWeight.Medium, pal.ink3) }
+            Column(Modifier.weight(1f)) { T("Alerts", 26, FontWeight.ExtraBold); T(p?.station ?: "", 13, FontWeight.Medium, pal.ink3) }
             Pill(if (duty) "On duty" else "Off duty", if (duty) pal.grn2 else pal.card2, if (duty) pal.grn else pal.ink3)
         }
         if (!duty) {
@@ -152,7 +152,7 @@ private fun ReportDetail(id: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Me() {
+private fun Me(onReplay: () -> Unit) {
     val p = Store.profile.value ?: return
     val duty by Store.onDuty
     val mode by Store.themeMode
@@ -173,6 +173,7 @@ private fun Me() {
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
         Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
         T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)
+        BigButton("Replay startup animation", Icons.Rounded.PlayArrow, 1, Modifier.fillMaxWidth(), onClick = onReplay)
         T("DharmIS 0.1 · OCAANA", 12, FontWeight.Medium, pal.ink3)
     }
 }

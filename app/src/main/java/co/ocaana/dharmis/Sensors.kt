@@ -20,26 +20,43 @@ fun demoAlert() = Alert("TX_NODE_03", "Near Thathengalam colony", "HIGH", System
 
 object Loc {
     val last = mutableStateOf<Location?>(null)
+    /** True while the phone's location switch is on. */
+    val on = mutableStateOf(false)
     private var listener: LocationListener? = null
 
+    fun enabled(ctx: Context): Boolean {
+        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).any { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+    }
+
+    /** Safe to call again after permission is granted or location is switched on. */
     @SuppressLint("MissingPermission")
     fun start(ctx: Context) {
-        if (listener != null) return
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val l = object : LocationListener {
+        on.value = enabled(ctx)
+        val l = listener ?: object : LocationListener {
             override fun onLocationChanged(location: Location) { last.value = location }
+            override fun onProviderEnabled(provider: String) { on.value = enabled(ctx) }
+            override fun onProviderDisabled(provider: String) { on.value = enabled(ctx) }
+        }.also { listener = it }
+        // Registering a switched-off provider is fine: it starts reporting once the switch is turned on.
+        for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
+            try {
+                lm.requestLocationUpdates(p, 5000L, 0f, l, Looper.getMainLooper())
+                lm.getLastKnownLocation(p)?.let { k -> if (last.value == null || k.time > last.value!!.time) last.value = k }
+            } catch (_: Exception) { }
         }
-        listener = l
-        try {
-            for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
-                if (lm.isProviderEnabled(p)) {
-                    lm.requestLocationUpdates(p, 5000L, 3f, l, Looper.getMainLooper())
-                    if (last.value == null) last.value = lm.getLastKnownLocation(p)
-                }
-            }
-        } catch (_: SecurityException) { listener = null }
     }
+
+    /** A fix from the last 5 minutes, or null. */
+    fun fresh(): Location? = last.value?.takeIf { System.currentTimeMillis() - it.time < 300_000 }
 }
+
+fun hasCompass(ctx: Context): Boolean =
+    (ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager).getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
+
+/** "NE · 42°" */
+fun bearingText(deg: Int): String = "${cardinal(deg.toDouble())} · $deg°"
 
 fun cardinal(deg: Double): String = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")[(((deg % 360) + 360) % 360 / 45 + .5).toInt() % 8]
 

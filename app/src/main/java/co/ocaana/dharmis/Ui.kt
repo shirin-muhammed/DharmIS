@@ -1,6 +1,8 @@
 package co.ocaana.dharmis
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,13 +17,19 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -42,7 +50,22 @@ val Semi = FontWeight.SemiBold
 
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding().imePadding(), content = content)
+    Column(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        AppHeader()
+        content()
+    }
+}
+
+/** The OCAANA elephant beside the DharmIS name, at the top of every screen. */
+@Composable
+fun AppHeader() {
+    val ctx = LocalContext.current
+    val logo = remember { BitmapFactory.decodeStream(ctx.assets.open("logo.png"), null, BitmapFactory.Options().apply { inSampleSize = 4 })!!.asImageBitmap() }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Image(logo, "OCAANA", Modifier.height(34.dp).aspectRatio(logo.width.toFloat() / logo.height))
+        Spacer(Modifier.width(10.dp))
+        Text(buildAnnotatedString { append("Dharm"); withStyle(SpanStyle(color = if (pal.dark) Color(0xFFD7B557) else Color(0xFFB58E35))) { append("IS") } }, color = pal.ink, fontSize = 20.sp, fontWeight = Heavy)
+    }
 }
 
 @Composable

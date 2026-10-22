@@ -1,7 +1,18 @@
 package co.ocaana.dharmis
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
+import androidx.activity.result.IntentSenderRequest
+import androidx.core.content.ContextCompat
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -19,6 +30,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) Loc.start(this)
         Api.syncPending()
     }
 }
@@ -38,8 +51,33 @@ fun App() {
         else -> loc?.let { isNight(it.latitude, it.longitude, now) } ?: system
     }
 
-    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { Loc.start(ctx) }
-    LaunchedEffect(Unit) { perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }
+    // Shows the system "Turn on location" dialog; phones without Google services get the Location settings page.
+    val settingsDialog = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { Loc.start(ctx) }
+    fun turnOnLocation() {
+        Loc.start(ctx)
+        if (Loc.enabled(ctx)) return
+        val req = LocationSettingsRequest.Builder().addLocationRequest(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L).build()).setAlwaysShow(true).build()
+        try {
+            LocationServices.getSettingsClient(ctx).checkLocationSettings(req)
+                .addOnSuccessListener { Loc.start(ctx) }
+                .addOnFailureListener { e ->
+                    if (e is ResolvableApiException) settingsDialog.launch(IntentSenderRequest.Builder(e.resolution).build())
+                    else ctx.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+        } catch (_: Exception) { ctx.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+    var fromButton by remember { mutableStateOf(false) }
+    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        if (r.values.any { it }) turnOnLocation()
+        else if (fromButton) ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        fromButton = false
+    }
+    fun askLocation(button: Boolean) {
+        fromButton = button
+        val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION).any { ContextCompat.checkSelfPermission(ctx, it) == PackageManager.PERMISSION_GRANTED }
+        if (granted) turnOnLocation() else perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+    LaunchedEffect(Unit) { askLocation(false) }
 
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
@@ -52,8 +90,8 @@ fun App() {
             splash -> Splash { splash = false }
             !registered -> Register { registered = true }
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { chat = null; review = false }
-            chat != null -> key(startStep) { Chat(chat!!, draft, startStep, onClose = { chat = null }, onReview = { review = true }) }
-            else -> Home { a -> draft.reset(); startStep = 0; chat = a }
+            chat != null -> key(startStep) { Chat(chat!!, draft, startStep, onClose = { chat = null }, onReview = { review = true }, onTurnOnLocation = { askLocation(true) }) }
+            else -> Home(onReport = { a -> draft.reset(); startStep = 0; chat = a }, onReplay = { splash = true })
         }
     }
 }
