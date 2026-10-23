@@ -69,11 +69,12 @@ private fun NavItem(label: String, icon: ImageVector, on: Boolean, modifier: Mod
 
 class LevelColors(val main: Color, val bg: Color, val text: Color, val on: Color)
 
-/** Same colours as the advisory on the OCAANA board: low yellow, medium orange, high red. */
+/** Same colours as the advisory on the OCAANA board: safe green, low yellow, medium orange, high red. */
 @Composable
 fun levelColors(level: String): LevelColors = when (level) {
     "LOW" -> if (pal.dark) LevelColors(Color(0xFFD9A73A), Color(0xFF3A2C10), Color(0xFFD9A73A), Color(0xFF0F1713)) else LevelColors(Color(0xFFA86500), Color(0xFFFBECC8), Color(0xFF7A4A00), Color.White)
     "MEDIUM" -> if (pal.dark) LevelColors(Color(0xFFF08A3C), Color(0xFF3D2412), Color(0xFFF08A3C), Color(0xFF0F1713)) else LevelColors(Color(0xFFC2570F), Color(0xFFFCE5D2), Color(0xFF9A430B), Color.White)
+    "SAFE" -> LevelColors(pal.grn, pal.grn2, pal.grn, if (pal.dark) Color(0xFF09241B) else Color.White)
     else -> LevelColors(pal.red, pal.red2, pal.redText, pal.onRed)
 }
 
