@@ -37,12 +37,12 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
 
     Page {
         BackBar(
-            when (step) { 0 -> "Your range office"; 1 -> "Your station"; else -> "About you" },
-            "Step ${step + 1} of 3",
+            when (step) { 0 -> "Your range office"; 1 -> "Your station"; 2 -> "About you"; else -> "Choose your PIN" },
+            "Step ${step + 1} of 4",
             onBack = { if (step > 0) step-- },
         )
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (i in 0..2) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
+            for (i in 0..3) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
         }
         Spacer(Modifier.height(14.dp))
         when (step) {
@@ -84,17 +84,56 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                     Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
                     T("Your role", 14, FontWeight.Bold, pal.ink2)
                     Chips(ROLES, setOf(role)) { role = it }
-                    Field("Choose a 4-digit PIN", pin, "4 digits", KeyboardType.NumberPassword) { pin = it.filter(Char::isDigit).take(4) }
-                    T("You will need this PIN, with your mobile number, to log in again if you change or reinstall the phone.", 12, FontWeight.Medium, pal.ink3)
-                    if (error.isNotEmpty()) T(error, 14, FontWeight.Bold, pal.red)
                 }
                 Column(Modifier.padding(20.dp)) {
-                    BigButton("Start using DharmIS", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = !busy && name.isNotBlank() && phone.length == 10 && pin.length == 4) {
-                        busy = true; error = ""
-                        Api.signUp(Profile(name.trim(), phone, role, (station ?: typedStation).trim(), range!!), pin) { e -> busy = false; if (e == null) onDone() else error = e }
-                    }
+                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10) { step = 3 }
                 }
             }
+            else -> {
+                var first by remember { mutableStateOf("") }
+                var again by remember { mutableStateOf(false) }
+                var mismatch by remember { mutableStateOf(false) }
+                val shown = if (again) pin else first
+                fun finish(p: String) {
+                    busy = true; error = ""
+                    Api.signUp(Profile(name.trim(), phone, role, (station ?: typedStation).trim(), range!!), p) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
+                }
+                fun press(d: Char) {
+                    if (busy) return
+                    mismatch = false
+                    val cur = if (again) pin else first
+                    if (cur.length >= 4) return
+                    val n = cur + d
+                    if (!again) { first = n; if (n.length == 4) again = true; return }
+                    pin = n
+                    if (n.length == 4) { if (n == first) finish(n) else { mismatch = true; pin = ""; first = ""; again = false } }
+                }
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(18.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    T(if (again) "Enter it again" else "Choose a 4-digit PIN", 24, FontWeight.ExtraBold)
+                    T("With your mobile number, it lets you log back in if you change or reinstall the phone. Do not share it.", 14, FontWeight.Medium, pal.ink2)
+                    PinDots(shown, mismatch)
+                    if (mismatch) T("The two PINs did not match. Start again.", 14, FontWeight.Bold, pal.red)
+                    if (error.isNotEmpty()) T(error, 14, FontWeight.Bold, pal.red)
+                    if (busy) T("Registering…", 14, FontWeight.Bold, pal.ink3)
+                    NumPad(::press) { if (!busy) { if (again) pin = pin.dropLast(1) else first = first.dropLast(1) } }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Welcome(onLogin: () -> Unit, onRegister: () -> Unit) {
+    Page {
+        Column(Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.Center) {
+            T("Elephant alerts for your response team", 30, FontWeight.ExtraBold)
+            Spacer(Modifier.height(10.dp))
+            T("Get an alert the moment a node raises one, and report what you see in a few taps.", 16, FontWeight.Medium, pal.ink2)
+        }
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            BigButton("Log in", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), onClick = onLogin)
+            BigButton("I am new, register", null, 1, Modifier.fillMaxWidth(), onClick = onRegister)
         }
     }
 }
@@ -106,19 +145,21 @@ fun Login(onBack: () -> Unit, onDone: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     BackHandler(onBack = onBack)
+    fun go() {
+        busy = true; error = ""
+        Api.logIn(phone, pin) { e -> busy = false; if (e == null) onDone() else { error = e; pin = "" } }
+    }
     Page {
-        BackBar("Log in", "Use the number and PIN you registered with", onBack = onBack)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
-            Field("PIN", pin, "4 digits", KeyboardType.NumberPassword) { pin = it.filter(Char::isDigit).take(4) }
+        BackBar("Log in", null, onBack = onBack)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth()) { Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) } }
+            T("Your PIN", 14, FontWeight.Bold, pal.ink2, Modifier.fillMaxWidth())
+            PinDots(pin, error.isNotEmpty())
             if (error.isNotEmpty()) T(error, 14, FontWeight.Bold, pal.red)
+            if (busy) T("Logging in…", 14, FontWeight.Bold, pal.ink3)
+            NumPad({ d -> if (!busy && pin.length < 4) { pin += d; error = ""; if (pin.length == 4 && phone.length == 10) go() } }) { if (!busy) pin = pin.dropLast(1) }
             T("Forgot your PIN? Ask your control room to reset it.", 13, FontWeight.Medium, pal.ink3)
-        }
-        Column(Modifier.padding(20.dp)) {
-            BigButton("Log in", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = !busy && phone.length == 10 && pin.length == 4) {
-                busy = true; error = ""
-                Api.logIn(phone, pin) { e -> busy = false; if (e == null) onDone() else error = e }
-            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

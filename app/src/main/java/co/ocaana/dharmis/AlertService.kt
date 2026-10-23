@@ -66,6 +66,7 @@ class AlertService : Service() {
     override fun onBind(i: Intent?): IBinder? = null
 
     override fun onStartCommand(i: Intent?, flags: Int, startId: Int): Int {
+        Store.init(applicationContext)
         Notify.channels(this)
         val n = Notify.watching(this)
         if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else startForeground(1, n)

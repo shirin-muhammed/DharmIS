@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if (Loc.wanted) Loc.start(this)
         Api.active = true
+        Store.resumeTick.value++
         Api.poll()
     }
 
@@ -97,7 +98,7 @@ fun App() {
 
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
-        var loginMode by remember { mutableStateOf(false) }
+        var mode2 by remember { mutableIntStateOf(0) }
         var chat by remember { mutableStateOf<Alert?>(null) }
         var review by remember { mutableStateOf(false) }
         val draft = remember { Draft() }
@@ -109,8 +110,9 @@ fun App() {
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         when {
             splash -> Splash { splash = false }
-            !registered && loginMode -> Login(onBack = { loginMode = false }) { Api.poll() }
-            !registered -> Register(onLogin = { loginMode = true }) { Api.poll() }
+            !registered && mode2 == 1 -> Login(onBack = { mode2 = 0 }) { Api.poll() }
+            !registered && mode2 == 2 -> Register(onLogin = { mode2 = 1 }) { Api.poll() }
+            !registered -> Welcome(onLogin = { mode2 = 1 }, onRegister = { mode2 = 2 })
             sentId != null -> Sent(sentId!!) { sentId = null }
             go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { id -> sentId = id; chat = null; review = false }

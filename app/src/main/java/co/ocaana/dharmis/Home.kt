@@ -77,6 +77,36 @@ fun levelColors(level: String): LevelColors = when (level) {
     else -> LevelColors(pal.red, pal.red2, pal.redText, pal.onRed)
 }
 
+/** Tells the member when Android would stop alerts reaching a locked phone, with a button to fix each cause. */
+@Composable
+private fun AlertHealth() {
+    val ctx = LocalContext.current
+    Store.resumeTick.value
+    val notifOk = androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+    val batteryOk = (ctx.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager).isIgnoringBatteryOptimizations(ctx.packageName)
+    if (notifOk && batteryOk) return
+    Card(Modifier.fillMaxWidth(), bg = pal.amb2, border = pal.amb, pad = 16.dp) {
+        T("Alerts may not reach you", 17, FontWeight.ExtraBold, pal.amb)
+        Spacer(Modifier.height(4.dp))
+        if (!notifOk) {
+            T("Notifications are switched off for DharmIS, so there will be no siren.", 14, FontWeight.Medium, pal.ink2)
+            Spacer(Modifier.height(8.dp))
+            BigButton("Allow notifications", Icons.Rounded.NotificationsActive, modifier = Modifier.fillMaxWidth()) {
+                ctx.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+        if (!batteryOk) {
+            T("Android puts DharmIS to sleep when the phone is locked for a while. Allow it to run in the background.", 14, FontWeight.Medium, pal.ink2)
+            Spacer(Modifier.height(8.dp))
+            BigButton("Allow in background", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) {
+                try { ctx.startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                catch (_: Exception) { ctx.startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     val duty by Store.onDuty
@@ -105,6 +135,7 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                 BigButton("Go on duty", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) { Store.setDuty(true) }
             }
         } else {
+            AlertHealth()
             val status by Store.serverStatus
             val online by Store.online
             val alerts = Store.alerts
@@ -123,7 +154,9 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                     Icon(if (online) Icons.Rounded.CheckCircle else Icons.Rounded.CloudOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
                     Spacer(Modifier.height(10.dp))
                     T(if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
-                    T(if (online) "All your nodes are quiet. You will see an alert here the moment one is raised." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
+                    T(if (online) "All your nodes are quiet. You are alerted when a node reaches High." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
+                    val ok = Store.lastOk.value
+                    if (ok > 0) T("Last checked " + SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date(ok)), 12, FontWeight.Bold, pal.ink3)
                 }
                 else -> alerts.forEach { a ->
                     val lc = levelColors(a.level)

@@ -84,7 +84,7 @@ object Api {
                     Alert(a.getString("node"), a.optString("place"), a.getString("level").uppercase(), now - a.optLong("age") * 1000,
                         if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"))
                 }
-                main.post { Store.serverStatus.value = status; Store.online.value = true; Store.alerts.clear(); Store.alerts.addAll(alerts) }
+                main.post { Store.serverStatus.value = status; Store.online.value = true; Store.lastOk.value = System.currentTimeMillis(); Store.alerts.clear(); Store.alerts.addAll(alerts) }
                 if (Store.onDuty.value) Notify.check(Store.app, alerts)
                 if (status == "active") send()
             } finally { busy = false }

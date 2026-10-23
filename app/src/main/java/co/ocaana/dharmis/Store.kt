@@ -40,13 +40,21 @@ object Store {
     /** False when the last attempt to reach the server failed. */
     val online = mutableStateOf(true)
     val alerts = mutableStateListOf<Alert>()
+    /** When the control room last answered, and a counter bumped each time the app comes back to the screen. */
+    val lastOk = mutableStateOf(0L)
+    val resumeTick = mutableStateOf(0)
     val token get() = sp.getString("token", "")!!
     fun setToken(t: String) { sp.edit().putString("token", t).apply() }
 
     lateinit var app: Context
         private set
 
+    private var ready = false
+
+    /** Safe to call again: the alert service can start the process without the activity. */
     fun init(ctx: Context) {
+        if (ready) return
+        ready = true
         app = ctx
         sp = ctx.getSharedPreferences("dharmis", Context.MODE_PRIVATE)
         file = File(ctx.filesDir, "reports.json")
