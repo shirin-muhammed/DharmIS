@@ -86,6 +86,7 @@ fun App() {
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(15_000); if (Api.active) Api.poll() } }
 
     // Alerts reach a locked phone through a service that runs while on duty; Android 13+ also needs the notification permission.
+    val registered = Store.profile.value != null
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(registered) {
         if (!registered) return@LaunchedEffect
@@ -98,7 +99,6 @@ fun App() {
         var splash by remember { mutableStateOf(true) }
         var chat by remember { mutableStateOf<Alert?>(null) }
         var review by remember { mutableStateOf(false) }
-        val registered = Store.profile.value != null
         val draft = remember { Draft() }
         var startStep by remember { mutableIntStateOf(0) }
         var go by remember { mutableStateOf<Alert?>(null) }
