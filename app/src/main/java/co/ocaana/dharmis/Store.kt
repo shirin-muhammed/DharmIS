@@ -43,7 +43,11 @@ object Store {
     val token get() = sp.getString("token", "")!!
     fun setToken(t: String) { sp.edit().putString("token", t).apply() }
 
+    lateinit var app: Context
+        private set
+
     fun init(ctx: Context) {
+        app = ctx
         sp = ctx.getSharedPreferences("dharmis", Context.MODE_PRIVATE)
         file = File(ctx.filesDir, "reports.json")
         photoDir = File(ctx.filesDir, "photos").apply { mkdirs() }
@@ -70,6 +74,7 @@ object Store {
     fun setDuty(on: Boolean) {
         onDuty.value = on; sp.edit().putBoolean("duty", on).apply()
         if (!on) alerts.clear()
+        AlertService.sync(app)
         Api.poll()
     }
     fun setTheme(m: Int) { themeMode.value = m; sp.edit().putInt("theme", m).apply() }
@@ -84,6 +89,13 @@ object Store {
     fun addCorrection(id: String, text: String) {
         reports.firstOrNull { it.id == id }?.corrections?.add(Correction(System.currentTimeMillis(), text))
         persist()
+    }
+
+    /** Signs this phone out: alerts stop and the member is forgotten here. Saved reports stay on the phone; they are never deleted. */
+    fun logout() {
+        Api.signOut()
+        setToken(""); sp.edit().remove("profile").apply()
+        profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget()
     }
 
     fun markSent(id: String) { reports.firstOrNull { it.id == id }?.sent = true; persist() }

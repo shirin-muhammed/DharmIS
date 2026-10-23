@@ -85,11 +85,20 @@ fun App() {
     // Fetch alerts and send waiting reports while the app is on screen.
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(15_000); if (Api.active) Api.poll() } }
 
+    // Alerts reach a locked phone through a service that runs while on duty; Android 13+ also needs the notification permission.
+    val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(registered) {
+        if (!registered) return@LaunchedEffect
+        Notify.channels(ctx)
+        if (android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+        AlertService.sync(ctx)
+    }
+
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
         var chat by remember { mutableStateOf<Alert?>(null) }
         var review by remember { mutableStateOf(false) }
-        var registered by remember { mutableStateOf(Store.profile.value != null) }
+        val registered = Store.profile.value != null
         val draft = remember { Draft() }
         var startStep by remember { mutableIntStateOf(0) }
         var go by remember { mutableStateOf<Alert?>(null) }
@@ -99,7 +108,7 @@ fun App() {
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         when {
             splash -> Splash { splash = false }
-            !registered -> Register { registered = true; Api.poll() }
+            !registered -> Register { Api.poll() }
             sentId != null -> Sent(sentId!!) { sentId = null }
             go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { id -> sentId = id; chat = null; review = false }

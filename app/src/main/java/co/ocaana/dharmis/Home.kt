@@ -12,7 +12,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.*
@@ -228,6 +231,18 @@ private fun Me() {
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
         Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
         T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)
+        var confirm by remember { mutableStateOf(false) }
+        BigButton("Log out", Icons.Rounded.Logout, 1, Modifier.fillMaxWidth()) { confirm = true }
+        if (confirm) {
+            val unsent = Store.reports.count { !it.sent }
+            AlertDialog(
+                onDismissRequest = { confirm = false },
+                title = { Text("Log out of DharmIS?") },
+                text = { Text("You will get no alerts on this phone until you register again and your control room approves you." + if (unsent > 0) " $unsent report${if (unsent > 1) "s" else ""} not yet sent stay on this phone and send after you log back in." else " Your saved reports stay on this phone.") },
+                confirmButton = { TextButton(onClick = { confirm = false; Store.logout(); AlertService.sync(ctx.applicationContext) }) { Text("Log out") } },
+                dismissButton = { TextButton(onClick = { confirm = false }) { Text("Stay logged in") } },
+            )
+        }
         T("DharmIS 0.1 · OCAANA", 12, FontWeight.Medium, pal.ink3)
     }
 }

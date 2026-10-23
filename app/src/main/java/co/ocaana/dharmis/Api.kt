@@ -69,10 +69,14 @@ object Api {
                         if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"))
                 }
                 main.post { Store.serverStatus.value = status; Store.online.value = true; Store.alerts.clear(); Store.alerts.addAll(alerts) }
+                if (Store.onDuty.value) Notify.check(Store.app, alerts)
                 if (status == "active") send()
             } finally { busy = false }
         }
     }
+
+    /** Tells the server this phone is done (no more alerts). Best effort. */
+    fun signOut() { if (enabled && Store.token.isNotBlank()) { val t = Store.token; thread { call("duty", JSONObject().put("on_duty", false), t) } } }
 
     fun syncPending() { if (enabled && Store.token.isNotBlank()) thread { send() } }
 
