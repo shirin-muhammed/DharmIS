@@ -45,7 +45,7 @@ object Notify {
         sounded.keys.retainAll(alerts.map { it.node }.toSet())
         for (a in alerts) {
             val r = rank[a.level] ?: continue
-            if ((sounded[a.node] ?: 0) >= r) continue
+            if (r < 3 || (sounded[a.node] ?: 0) >= r) continue
             sounded[a.node] = r
             ring(ctx, a)
         }

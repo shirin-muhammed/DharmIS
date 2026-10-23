@@ -65,7 +65,7 @@ fun Splash(onFinished: () -> Unit) {
     val t = prog.value
     val paint = remember { NativePaint(NativePaint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT_BOLD } }
 
-    Canvas(Modifier.fillMaxSize().background(Color(0xFF0A110E))) {
+    Canvas(Modifier.fillMaxSize().background(Color(0xFF09241B))) {
         val k = size.width / 720f
         val settle = eio(st(t, 2500f, 3200f))
         val scale = 1f - .32f * settle

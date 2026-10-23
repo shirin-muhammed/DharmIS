@@ -24,9 +24,9 @@ val LightPal = Pal(
 )
 
 val DarkPal = Pal(
-    true, Color(0xFF0F1713), Color(0xFF18231E), Color(0xFF223029), Color(0xFF2F3D36),
+    true, Color(0xFF09241B), Color(0xFF0F3226), Color(0xFF164034), Color(0xFF1F4D3E),
     Color(0xFFE8EFE9), Color(0xFFB3C0B8), Color(0xFF8D9C93),
-    Color(0xFF4CC2A8), Color(0xFF0F1713), Color(0xFF1B3A30),
+    Color(0xFF4CC2A8), Color(0xFF09241B), Color(0xFF14463A),
     Color(0xFFD9402D), Color(0xFFFFFFFF), Color(0xFF401A17), Color(0xFFFF8A7C),
     Color(0xFFF0B54A), Color(0xFF3A2C10), Color(0xFF5FD08A), Color(0xFF163423),
 )
