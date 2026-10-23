@@ -74,7 +74,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                 }
             }
-            else -> {
+            2 -> {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Card(Modifier.fillMaxWidth(), bg = pal.pri2, border = null) {
                         T(station ?: typedStation, 16, FontWeight.ExtraBold, pal.pri)
