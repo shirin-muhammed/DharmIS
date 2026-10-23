@@ -13,10 +13,11 @@ import android.os.Looper
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 
-class Alert(val node: String, val place: String, val level: String, val since: Long, val lat: Double, val lon: Double)
+/** lat and lon are NaN when the node has no place recorded yet. */
+class Alert(val node: String, val place: String, val level: String, val since: Long, val lat: Double, val lon: Double) {
+    val hasPos get() = !lat.isNaN() && !lon.isNaN()
+}
 
-/** Placeholder until the server sends real alerts: clearly labelled as a demo in the UI. */
-fun demoAlert() = Alert("TX_NODE_03", "Near Thathengalam colony", "HIGH", System.currentTimeMillis() - 9 * 60_000, 10.9917, 76.4631)
 
 object Loc {
     val last = mutableStateOf<Location?>(null)

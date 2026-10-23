@@ -105,7 +105,7 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
     var tick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { while (true) { Loc.on.value = Loc.enabled(ctx); tick++; kotlinx.coroutines.delay(2000) } }
     var typed by remember { mutableStateOf("") }
-    val gpsDist: Float? = run { tick; Loc.fresh() }?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
+    val gpsDist: Float? = run { tick; Loc.fresh() }?.takeIf { alert.hasPos }?.let { l -> val r = FloatArray(1); android.location.Location.distanceBetween(l.latitude, l.longitude, alert.lat, alert.lon, r); r[0] }
     BackHandler { if (step > 0) step-- else onClose() }
 
     val photoFile = remember { File(ctx.cacheDir, "shots").apply { mkdirs() }.let { File(it, "shot.jpg") } }

@@ -30,12 +30,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (Loc.wanted) Loc.start(this)
-        Api.syncPending()
+        Api.active = true
+        Api.poll()
     }
 
     // Location is only ever on while a report or the Go map is open, and not while the app is in the background.
     override fun onPause() {
         super.onPause()
+        Api.active = false
         Loc.pause(this)
     }
 }
@@ -80,6 +82,9 @@ fun App() {
         if (granted) turnOnLocation() else perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
 
+    // Fetch alerts and send waiting reports while the app is on screen.
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(15_000); if (Api.active) Api.poll() } }
+
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
         var chat by remember { mutableStateOf<Alert?>(null) }
@@ -94,7 +99,7 @@ fun App() {
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         when {
             splash -> Splash { splash = false }
-            !registered -> Register { registered = true }
+            !registered -> Register { registered = true; Api.poll() }
             sentId != null -> Sent(sentId!!) { sentId = null }
             go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })
             chat != null && review -> Review(chat!!, draft, onChange = { review = false; startStep = 5 }, onBack = { review = false; startStep = 5 }) { id -> sentId = id; chat = null; review = false }

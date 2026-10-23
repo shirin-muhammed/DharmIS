@@ -91,24 +91,43 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                 BigButton("Go on duty", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) { Store.setDuty(true) }
             }
         } else {
-            val a = remember { demoAlert() }
-            Card(Modifier.fillMaxWidth(), bg = pal.red2, border = pal.red, pad = 18.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(pal.red).padding(horizontal = 8.dp, vertical = 2.dp)) { T(a.level, 11, FontWeight.ExtraBold, pal.onRed) }
-                    Spacer(Modifier.width(8.dp)); T(ago(a.since), 13, FontWeight.Bold, pal.redText)
+            val status by Store.serverStatus
+            val online by Store.online
+            val alerts = Store.alerts
+            when {
+                status == "pending" || status == "" && Store.token.isBlank() && online -> Card(Modifier.fillMaxWidth(), pad = 24.dp) {
+                    Icon(Icons.Rounded.HourglassTop, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
+                    Spacer(Modifier.height(10.dp))
+                    T("Waiting for approval", 20, FontWeight.ExtraBold)
+                    T("Your control room must approve you before alerts start. Ask them to check the RRT members list on the OCAANA control site.", 14, FontWeight.Medium, pal.ink2)
                 }
-                Spacer(Modifier.height(8.dp))
-                T(a.node, 24, FontWeight.ExtraBold, pal.redText)
-                T(a.place, 15, FontWeight.Medium, pal.ink2)
-                Spacer(Modifier.height(6.dp))
-                T("Example alert. Live alerts start once your office connects DharmIS to the control room.", 12, FontWeight.Bold, pal.ink3)
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BigButton("Go", Icons.Rounded.Navigation, 1, Modifier.weight(1f)) { onGo(a) }
-                    BigButton("Report now", Icons.Rounded.Edit, 2, Modifier.weight(2f)) { onReport(a) }
+                status == "blocked" -> Card(Modifier.fillMaxWidth(), pad = 24.dp) {
+                    T("Your access is switched off", 20, FontWeight.ExtraBold)
+                    T("Please call your range office.", 14, FontWeight.Medium, pal.ink2)
+                }
+                alerts.isEmpty() -> Card(Modifier.fillMaxWidth(), pad = 24.dp) {
+                    Icon(if (online) Icons.Rounded.CheckCircle else Icons.Rounded.CloudOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
+                    Spacer(Modifier.height(10.dp))
+                    T(if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
+                    T(if (online) "All your nodes are quiet. You will see an alert here the moment one is raised." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
+                }
+                else -> alerts.forEach { a ->
+                    Card(Modifier.fillMaxWidth(), bg = pal.red2, border = pal.red, pad = 18.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(pal.red).padding(horizontal = 8.dp, vertical = 2.dp)) { T(a.level, 11, FontWeight.ExtraBold, pal.onRed) }
+                            Spacer(Modifier.width(8.dp)); T(ago(a.since), 13, FontWeight.Bold, pal.redText)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        T(a.node, 24, FontWeight.ExtraBold, pal.redText)
+                        if (a.place.isNotBlank()) T(a.place, 15, FontWeight.Medium, pal.ink2)
+                        Spacer(Modifier.height(14.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (a.hasPos) BigButton("Go", Icons.Rounded.Navigation, 1, Modifier.weight(1f)) { onGo(a) }
+                            BigButton("Report now", Icons.Rounded.Edit, 2, Modifier.weight(2f)) { onReport(a) }
+                        }
+                    }
                 }
             }
-            T("No other alerts", 14, FontWeight.Medium, pal.ink3)
         }
     }
 }

@@ -10,7 +10,7 @@ import java.io.File
 
 class Profile(val name: String, val phone: String, val role: String, val station: String, val range: RangeOffice)
 
-class Correction(val at: Long, val text: String)
+class Correction(val at: Long, val text: String, var synced: Boolean = false)
 
 class Report(
     val id: String, val createdAt: Long, val nodeId: String, val seen: String,
@@ -35,6 +35,13 @@ object Store {
     val reports = mutableStateListOf<Report>()
     /** Bumped on every report change so screens re-read corrections and sent flags. */
     val version = mutableStateOf(0)
+    /** Server state: "" not known yet, pending (waiting for staff), active, blocked. */
+    val serverStatus = mutableStateOf("")
+    /** False when the last attempt to reach the server failed. */
+    val online = mutableStateOf(true)
+    val alerts = mutableStateListOf<Alert>()
+    val token get() = sp.getString("token", "")!!
+    fun setToken(t: String) { sp.edit().putString("token", t).apply() }
 
     fun init(ctx: Context) {
         sp = ctx.getSharedPreferences("dharmis", Context.MODE_PRIVATE)
@@ -60,7 +67,11 @@ object Store {
         sp.edit().putString("profile", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station).put("range", p.range.name).toString()).apply()
     }
 
-    fun setDuty(on: Boolean) { onDuty.value = on; sp.edit().putBoolean("duty", on).apply() }
+    fun setDuty(on: Boolean) {
+        onDuty.value = on; sp.edit().putBoolean("duty", on).apply()
+        if (!on) alerts.clear()
+        Api.poll()
+    }
     fun setTheme(m: Int) { themeMode.value = m; sp.edit().putInt("theme", m).apply() }
 
     /** Language the voice note listens for: ml-IN or en-IN. */
@@ -76,6 +87,7 @@ object Store {
     }
 
     fun markSent(id: String) { reports.firstOrNull { it.id == id }?.sent = true; persist() }
+    fun markCorrectionSynced(id: String, at: Long) { reports.firstOrNull { it.id == id }?.corrections?.firstOrNull { it.at == at }?.synced = true; persist() }
 
     private fun persist() { file.writeText(JSONArray(reports.map { toJson(it) }).toString()); version.value++ }
 
@@ -84,7 +96,7 @@ object Store {
         .put("adults", r.adults).put("calves", r.calves).put("tuskers", r.tuskers).put("dir", r.direction).put("bearing", r.bearing ?: JSONObject.NULL)
         .put("activity", JSONArray(r.activity)).put("dist", r.distanceM ?: JSONObject.NULL)
         .put("photo", r.photo ?: JSONObject.NULL).put("note", r.note).put("sent", r.sent)
-        .put("corr", JSONArray(r.corrections.map { JSONObject().put("at", it.at).put("text", it.text) }))
+        .put("corr", JSONArray(r.corrections.map { JSONObject().put("at", it.at).put("text", it.text).put("sy", it.synced) }))
 
     private fun fromJson(o: JSONObject): Report {
         val act = o.getJSONArray("activity"); val cr = o.getJSONArray("corr")
@@ -94,7 +106,7 @@ object Store {
             List(act.length()) { act.getString(it) },
             if (o.isNull("dist")) null else o.getInt("dist"),
             if (o.isNull("photo")) null else o.getString("photo"), o.getString("note"),
-            o.getBoolean("sent"), MutableList(cr.length()) { Correction(cr.getJSONObject(it).getLong("at"), cr.getJSONObject(it).getString("text")) },
+            o.getBoolean("sent"), MutableList(cr.length()) { Correction(cr.getJSONObject(it).getLong("at"), cr.getJSONObject(it).getString("text"), cr.getJSONObject(it).optBoolean("sy")) },
             if (o.isNull("bearing")) null else o.getInt("bearing"),
         )
     }
