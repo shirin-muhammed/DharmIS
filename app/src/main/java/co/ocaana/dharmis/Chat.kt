@@ -42,6 +42,7 @@ class Draft {
     var adults by mutableIntStateOf(0)
     var calves by mutableIntStateOf(0)
     var tuskers by mutableIntStateOf(0)
+    var others by mutableStateOf("")
     var direction by mutableStateOf<String?>(null)
     var bearing by mutableStateOf<Int?>(null)
     var distance by mutableStateOf<Int?>(null)
@@ -51,7 +52,7 @@ class Draft {
     var photoKb by mutableIntStateOf(0)
     var note by mutableStateOf("")
     val herd get() = adults + calves + tuskers
-    fun reset() { seen = null; adults = 0; calves = 0; tuskers = 0; direction = null; bearing = null; distance = null; distanceLabel = ""; activity = emptySet(); photoId = null; photoKb = 0; note = "" }
+    fun reset() { seen = null; adults = 0; calves = 0; tuskers = 0; others = ""; direction = null; bearing = null; distance = null; distanceLabel = ""; activity = emptySet(); photoId = null; photoKb = 0; note = "" }
 }
 
 val SEEN = listOf(
@@ -154,7 +155,7 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
             if (step >= 0) Bubble("Are elephants there right now?", false)
             if (step >= 1) Bubble(draft.seen ?: "", true)
             if (step >= 1) Bubble("Roughly how many?", false)
-            if (step >= 2) Bubble("${draft.herd} · ${draft.calves} calves · ${draft.tuskers} tusker${if (draft.tuskers == 1) "" else "s"}", true)
+            if (step >= 2) Bubble("${draft.herd} · ${draft.calves} calves · ${draft.tuskers} tusker${if (draft.tuskers == 1) "" else "s"}" + (if (draft.others.isNotBlank()) " · ${draft.others.trim()}" else ""), true)
             if (step >= 2) Bubble("Which way are they moving?", false)
             if (step >= 3) Bubble(draft.direction ?: "Not sure", true)
             if (step >= 3) Bubble(
@@ -176,7 +177,7 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     SEEN.forEach { (t, s, ic) ->
                         OptionRow(t, s, ic, draft.seen == t) {
                             draft.seen = t
-                            if (t == "No elephants here") { draft.adults = 0; draft.calves = 0; draft.tuskers = 0; draft.direction = "Not sure"; draft.bearing = null; draft.distance = null; draft.distanceLabel = "Not applicable"; onReview() } else step = 1
+                            if (t == "No elephants here") { draft.adults = 0; draft.calves = 0; draft.tuskers = 0; draft.others = ""; draft.direction = "Not sure"; draft.bearing = null; draft.distance = null; draft.distanceLabel = "Not applicable"; onReview() } else step = 1
                         }
                     }
                 }
@@ -187,7 +188,8 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
                     Counter("Adults", "Grown elephants", draft.adults) { draft.adults = it }
                     Counter("Calves", "Young ones", draft.calves) { draft.calves = it }
                     Counter("Tuskers", "Bulls with tusks", draft.tuskers) { draft.tuskers = it }
-                    BigButton("Next", enabled = draft.herd > 0, modifier = Modifier.fillMaxWidth()) { step = 2 }
+                    TextBox(draft.others, "Others, e.g. 1 injured bull (optional)") { draft.others = it.take(120) }
+                    BigButton("Next", enabled = draft.herd > 0 || draft.others.isNotBlank(), modifier = Modifier.fillMaxWidth()) { step = 2 }
                 }
                 2 -> {
                     T("Tap a direction, or use your compass", 13, FontWeight.Bold, pal.ink3)
@@ -290,6 +292,7 @@ fun Review(alert: Alert, draft: Draft, onChange: () -> Unit, onBack: () -> Unit,
                 Spacer(Modifier.height(10.dp))
                 val rows = buildList {
                     add("Seen" to (draft.seen ?: ""))
+                    if (draft.others.isNotBlank()) add("Others" to draft.others.trim())
                     if (draft.herd > 0) add("Herd" to "${draft.herd}: ${draft.adults} adults, ${draft.calves} calves, ${draft.tuskers} tusker${if (draft.tuskers == 1) "" else "s"}")
                     add("Moving" to cardinalLabel(draft.direction))
                     add("Distance" to draft.distanceLabel)
@@ -310,7 +313,7 @@ fun Review(alert: Alert, draft: Draft, onChange: () -> Unit, onBack: () -> Unit,
         }
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             BigButton("Save and send", Icons.Rounded.Send, modifier = Modifier.fillMaxWidth()) {
-                val r = Report(UUID.randomUUID().toString(), System.currentTimeMillis(), alert.node, draft.seen ?: "", draft.adults, draft.calves, draft.tuskers, cardinalLabel(draft.direction), draft.activity.toList(), draft.distance, draft.photoId, draft.note.trim(), false, mutableListOf(), draft.bearing)
+                val r = Report(UUID.randomUUID().toString(), System.currentTimeMillis(), alert.node, draft.seen ?: "", draft.adults, draft.calves, draft.tuskers, cardinalLabel(draft.direction), draft.activity.toList(), draft.distance, draft.photoId, draft.note.trim(), false, mutableListOf(), draft.bearing, draft.others.trim())
                 Store.add(r); Api.syncPending(); onSaved(r.id)
             }
             BigButton("Change an answer", null, 1, Modifier.fillMaxWidth(), onClick = onChange)

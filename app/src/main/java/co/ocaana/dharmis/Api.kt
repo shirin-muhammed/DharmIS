@@ -119,7 +119,7 @@ object Api {
             val body = JSONObject().put("id", r.id).put("at", r.createdAt).put("node", r.nodeId).put("seen", r.seen)
                 .put("adults", r.adults).put("calves", r.calves).put("tuskers", r.tuskers).put("direction", r.direction)
                 .put("bearing", r.bearing ?: JSONObject.NULL).put("activity", org.json.JSONArray(r.activity)).put("dist", r.distanceM ?: JSONObject.NULL)
-                .put("note", r.note).put("photo", photo ?: JSONObject.NULL)
+                .put("note", r.note).put("others", r.others).put("photo", photo ?: JSONObject.NULL)
             val x = call("report", body) ?: return
             if (x.code in 200..299) main.post { Store.markSent(r.id) } else if (x.code == 403 || x.code == 401) return
         }

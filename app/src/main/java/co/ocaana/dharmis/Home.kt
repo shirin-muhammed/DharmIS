@@ -210,6 +210,7 @@ private fun ReportDetail(id: String, onBack: () -> Unit) {
             Card(Modifier.fillMaxWidth(), pad = 18.dp) {
                 listOfNotNull(
                     "Seen" to r.seen,
+                    if (r.others.isNotBlank()) "Others" to r.others else null,
                     if (r.herd > 0) "Herd" to "${r.herd}: ${r.adults} adults, ${r.calves} calves, ${r.tuskers} tuskers" else null,
                     "Moving" to r.direction,
                     r.distanceM?.let { "Distance" to kmText(it.toFloat()) },

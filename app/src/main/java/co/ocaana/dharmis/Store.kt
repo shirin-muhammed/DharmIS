@@ -18,6 +18,7 @@ class Report(
     val distanceM: Int?, val photo: String?, val note: String,
     var sent: Boolean, val corrections: MutableList<Correction>,
     val bearing: Int? = null,
+    val others: String = "",
 ) {
     val herd get() = adults + calves + tuskers
 }
@@ -118,7 +119,7 @@ object Store {
         .put("id", r.id).put("at", r.createdAt).put("node", r.nodeId).put("seen", r.seen)
         .put("adults", r.adults).put("calves", r.calves).put("tuskers", r.tuskers).put("dir", r.direction).put("bearing", r.bearing ?: JSONObject.NULL)
         .put("activity", JSONArray(r.activity)).put("dist", r.distanceM ?: JSONObject.NULL)
-        .put("photo", r.photo ?: JSONObject.NULL).put("note", r.note).put("sent", r.sent)
+        .put("photo", r.photo ?: JSONObject.NULL).put("note", r.note).put("others", r.others).put("sent", r.sent)
         .put("corr", JSONArray(r.corrections.map { JSONObject().put("at", it.at).put("text", it.text).put("sy", it.synced) }))
 
     private fun fromJson(o: JSONObject): Report {
@@ -131,6 +132,7 @@ object Store {
             if (o.isNull("photo")) null else o.getString("photo"), o.getString("note"),
             o.getBoolean("sent"), MutableList(cr.length()) { Correction(cr.getJSONObject(it).getLong("at"), cr.getJSONObject(it).getString("text"), cr.getJSONObject(it).optBoolean("sy")) },
             if (o.isNull("bearing")) null else o.getInt("bearing"),
+            o.optString("others"),
         )
     }
 }
