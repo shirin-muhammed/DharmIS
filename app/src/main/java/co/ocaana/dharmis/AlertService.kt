@@ -42,17 +42,29 @@ object Notify {
 
     /** Called after every successful fetch with the alerts now showing. */
     fun check(ctx: Context, alerts: List<Alert>) {
-        val nm = ctx.getSystemService(NotificationManager::class.java)
         sounded.keys.retainAll(alerts.map { it.node }.toSet())
         for (a in alerts) {
             val r = rank[a.level] ?: continue
             if ((sounded[a.node] ?: 0) >= r) continue
             sounded[a.node] = r
-            val text = "${a.level.lowercase().replaceFirstChar { it.uppercase() }} alert" + if (a.place.isNotBlank()) " · ${a.place}" else ""
-            nm.notify(a.node.hashCode(), NotificationCompat.Builder(ctx, SIREN).setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle(a.node).setContentText(text).setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX)
-                .setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}")).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(open(ctx)).build())
+            ring(ctx, a)
         }
+    }
+
+    /** A push that arrived while the app was asleep. Same once-per-rise rule as the poll path. */
+    fun push(ctx: Context, a: Alert) {
+        val r = rank[a.level] ?: return
+        if ((sounded[a.node] ?: 0) >= r) return
+        sounded[a.node] = r
+        ring(ctx, a)
+    }
+
+    private fun ring(ctx: Context, a: Alert) {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        val text = "${a.level.lowercase().replaceFirstChar { it.uppercase() }} alert" + if (a.place.isNotBlank()) " · ${a.place}" else ""
+        nm.notify(a.node.hashCode(), NotificationCompat.Builder(ctx, SIREN).setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(a.node).setContentText(text).setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}")).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(open(ctx)).build())
     }
 
     fun forget() { sounded.clear() }

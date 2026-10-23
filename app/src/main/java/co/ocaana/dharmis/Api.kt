@@ -61,6 +61,21 @@ object Api {
         }
     }
 
+    private var pushSent = ""
+
+    /** Gives the server this phone's Google push address. Safe to call often; does nothing without Firebase set up. */
+    fun sendPushToken(tok: String? = null) {
+        if (!enabled || Store.token.isBlank()) return
+        thread {
+            try {
+                val t = tok ?: com.google.android.gms.tasks.Tasks.await(com.google.firebase.messaging.FirebaseMessaging.getInstance().token)
+                if (Store.token + t == pushSent) return@thread
+                val r = call("push_token", JSONObject().put("token", t))
+                if (r != null && r.code == 200) pushSent = Store.token + t
+            } catch (_: Exception) {}
+        }
+    }
+
     /** One round: make sure we are registered, fetch alerts, then send anything waiting. Safe to call often. */
     fun poll() {
         if (!enabled || busy || Store.profile.value == null) return
@@ -69,6 +84,7 @@ object Api {
             try {
                 if (Store.token.isBlank()) return@thread
                 val duty = Store.onDuty.value
+                sendPushToken()
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
                 if (r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
