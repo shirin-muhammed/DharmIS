@@ -139,10 +139,11 @@ fun Chat(alert: Alert, draft: Draft, startStep: Int, onClose: () -> Unit, onRevi
 
     Page {
         BackBar("Report", "Saved on this phone", onBack = { if (step > 0) step-- else onClose() })
-        Row(Modifier.fillMaxWidth().background(pal.red2).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(pal.red).padding(horizontal = 8.dp, vertical = 2.dp)) { T(alert.level, 11, FontWeight.ExtraBold, pal.onRed) }
+        val lc = levelColors(alert.level)
+        Row(Modifier.fillMaxWidth().background(lc.bg).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(lc.main).padding(horizontal = 8.dp, vertical = 2.dp)) { T(alert.level, 11, FontWeight.ExtraBold, lc.on) }
             Spacer(Modifier.width(8.dp))
-            T("${alert.node} · ${alert.place}", 13, FontWeight.Bold, pal.redText)
+            T(if (alert.place.isBlank()) alert.node else "${alert.node} · ${alert.place}", 13, FontWeight.Bold, lc.text)
         }
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (i in 0..5) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))

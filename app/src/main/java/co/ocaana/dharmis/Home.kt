@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,6 +62,16 @@ private fun NavItem(label: String, icon: ImageVector, on: Boolean, modifier: Mod
         Icon(icon, null, tint = if (on) pal.pri else pal.ink3, modifier = Modifier.size(26.dp))
         T(label, 12, FontWeight.Bold, if (on) pal.pri else pal.ink3)
     }
+}
+
+class LevelColors(val main: Color, val bg: Color, val text: Color, val on: Color)
+
+/** Same colours as the advisory on the OCAANA board: low yellow, medium orange, high red. */
+@Composable
+fun levelColors(level: String): LevelColors = when (level) {
+    "LOW" -> if (pal.dark) LevelColors(Color(0xFFD9A73A), Color(0xFF3A2C10), Color(0xFFD9A73A), Color(0xFF0F1713)) else LevelColors(Color(0xFFA86500), Color(0xFFFBECC8), Color(0xFF7A4A00), Color.White)
+    "MEDIUM" -> if (pal.dark) LevelColors(Color(0xFFF08A3C), Color(0xFF3D2412), Color(0xFFF08A3C), Color(0xFF0F1713)) else LevelColors(Color(0xFFC2570F), Color(0xFFFCE5D2), Color(0xFF9A430B), Color.White)
+    else -> LevelColors(pal.red, pal.red2, pal.redText, pal.onRed)
 }
 
 @Composable
@@ -112,13 +123,14 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                     T(if (online) "All your nodes are quiet. You will see an alert here the moment one is raised." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
                 }
                 else -> alerts.forEach { a ->
-                    Card(Modifier.fillMaxWidth(), bg = pal.red2, border = pal.red, pad = 18.dp) {
+                    val lc = levelColors(a.level)
+                    Card(Modifier.fillMaxWidth(), bg = lc.bg, border = lc.main, pad = 18.dp) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(pal.red).padding(horizontal = 8.dp, vertical = 2.dp)) { T(a.level, 11, FontWeight.ExtraBold, pal.onRed) }
-                            Spacer(Modifier.width(8.dp)); T(ago(a.since), 13, FontWeight.Bold, pal.redText)
+                            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(lc.main).padding(horizontal = 8.dp, vertical = 2.dp)) { T(a.level, 11, FontWeight.ExtraBold, lc.on) }
+                            Spacer(Modifier.width(8.dp)); T(ago(a.since), 13, FontWeight.Bold, lc.text)
                         }
                         Spacer(Modifier.height(8.dp))
-                        T(a.node, 24, FontWeight.ExtraBold, pal.redText)
+                        T(a.node, 24, FontWeight.ExtraBold, lc.text)
                         if (a.place.isNotBlank()) T(a.place, 15, FontWeight.Medium, pal.ink2)
                         Spacer(Modifier.height(14.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
