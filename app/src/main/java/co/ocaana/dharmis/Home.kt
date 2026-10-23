@@ -238,7 +238,7 @@ private fun Me() {
             AlertDialog(
                 onDismissRequest = { confirm = false },
                 title = { Text("Log out of DharmIS?") },
-                text = { Text("You will get no alerts on this phone until you register again and your control room approves you." + if (unsent > 0) " $unsent report${if (unsent > 1) "s" else ""} not yet sent stay on this phone and send after you log back in." else " Your saved reports stay on this phone.") },
+                text = { Text("You will get no alerts on this phone until you log in again with your mobile number and PIN." + if (unsent > 0) " $unsent report${if (unsent > 1) "s" else ""} not yet sent stay on this phone and send after you log back in." else " Your saved reports stay on this phone.") },
                 confirmButton = { TextButton(onClick = { confirm = false; Store.logout(); AlertService.sync(ctx.applicationContext) }) { Text("Log out") } },
                 dismissButton = { TextButton(onClick = { confirm = false }) { Text("Stay logged in") } },
             )

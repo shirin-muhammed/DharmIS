@@ -35,14 +35,30 @@ object Api {
         Reply(code, try { JSONObject(txt) } catch (_: Exception) { JSONObject() })
     } catch (_: Exception) { null }
 
-    private fun register(): Boolean {
-        val p = Store.profile.value ?: return false
-        val r = call("register", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station)
-            .put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle), "") ?: return false
-        val t = r.json.optString("token")
-        if (r.code != 200 || t.isBlank()) return false
-        Store.setToken(t)
-        return true
+    private fun failText(r: Reply?) = if (r == null) "No signal. Try again." else r.json.optString("error").ifBlank { "Something went wrong. Try again." }
+
+    /** Registers a new member. done gets null on success (token saved) or a message to show. */
+    fun signUp(p: Profile, pin: String, done: (String?) -> Unit) {
+        thread {
+            val r = call("register", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station)
+                .put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle).put("pin", pin), "")
+            val t = r?.json?.optString("token") ?: ""
+            if (r != null && r.code == 200 && t.isNotBlank()) { main.post { Store.setToken(t); Store.saveProfile(p); done(null) } }
+            else main.post { done(failText(r)) }
+        }
+    }
+
+    /** Signs in an existing member on this phone (after a reinstall or a new phone). */
+    fun logIn(phone: String, pin: String, done: (String?) -> Unit) {
+        thread {
+            val r = call("login", JSONObject().put("phone", phone).put("pin", pin), "")
+            val m = r?.json?.optJSONObject("member")
+            val t = r?.json?.optString("token") ?: ""
+            if (r == null || r.code != 200 || m == null || t.isBlank()) { main.post { done(failText(r)) }; return@thread }
+            val range = Directory.ranges.firstOrNull { it.name == m.optString("range") && it.division == m.optString("division") } ?: Directory.ranges.firstOrNull { it.name == m.optString("range") }
+            if (range == null) { main.post { done("Your range office is not in this app's list. Call your control room.") }; return@thread }
+            main.post { Store.setToken(t); Store.saveProfile(Profile(m.optString("name"), m.optString("phone"), m.optString("role"), m.optString("station"), range)); done(null) }
+        }
     }
 
     /** One round: make sure we are registered, fetch alerts, then send anything waiting. Safe to call often. */
@@ -51,10 +67,10 @@ object Api {
         busy = true
         thread {
             try {
-                if (Store.token.isBlank() && !register()) { main.post { Store.online.value = false }; return@thread }
+                if (Store.token.isBlank()) return@thread
                 val duty = Store.onDuty.value
                 var r = call("alerts")
-                if (r != null && r.code == 401) { Store.setToken(""); main.post { Store.serverStatus.value = "" }; return@thread }
+                if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
                 if (r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
                     call("duty", JSONObject().put("on_duty", duty))
                     r = call("alerts")

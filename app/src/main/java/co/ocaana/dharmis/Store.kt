@@ -98,6 +98,9 @@ object Store {
         profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget()
     }
 
+    /** The server no longer knows this phone (for example the PIN was used to log in elsewhere): back to the log in screen. Reports stay. */
+    fun signedOut() { setToken(""); sp.edit().remove("profile").apply(); profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget(); AlertService.sync(app) }
+
     fun markSent(id: String) { reports.firstOrNull { it.id == id }?.sent = true; persist() }
     fun markCorrectionSynced(id: String, at: Long) { reports.firstOrNull { it.id == id }?.corrections?.firstOrNull { it.at == at }?.synced = true; persist() }
 
