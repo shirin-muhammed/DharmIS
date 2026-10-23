@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "163110986270",
+    "project_id": "dharmis",
+    "storage_bucket": "dharmis.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:163110986270:android:3b165d946e587ed654840f",
+        "android_client_info": {
+          "package_name": "co.ocaana.dharmis"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC4P4unREXoOJcAyvovtNK1YpRprA1X99c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
