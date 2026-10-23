@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 /** Sirens once per alert. An alert sounds again only if its level goes up or it clears and comes back. */
 object Notify {
     private const val SIREN = "alert_siren_v1"
+    private const val MEDIUM = "alert_medium_v1"
     private const val WATCH = "watch_v1"
     private val sounded = HashMap<String, Int>()
     private val rank = mapOf("LOW" to 1, "MEDIUM" to 2, "HIGH" to 3)
@@ -34,6 +35,7 @@ object Notify {
             setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}"), attrs)
             enableVibration(true); vibrationPattern = longArrayOf(0, 600, 300, 600)
         })
+        nm.createNotificationChannel(NotificationChannel(MEDIUM, "Medium alerts", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "A normal notification when a node reaches Medium" })
         nm.createNotificationChannel(NotificationChannel(WATCH, "Watching for alerts", NotificationManager.IMPORTANCE_LOW).apply { description = "Shown while you are on duty"; setShowBadge(false) })
     }
 
@@ -45,7 +47,7 @@ object Notify {
         sounded.keys.retainAll(alerts.map { it.node }.toSet())
         for (a in alerts) {
             val r = rank[a.level] ?: continue
-            if (r < 3 || (sounded[a.node] ?: 0) >= r) continue
+            if (r < 2 || (sounded[a.node] ?: 0) >= r) continue
             sounded[a.node] = r
             ring(ctx, a)
         }
@@ -54,17 +56,22 @@ object Notify {
     /** A push that arrived while the app was asleep. Same once-per-rise rule as the poll path. */
     fun push(ctx: Context, a: Alert) {
         val r = rank[a.level] ?: return
-        if ((sounded[a.node] ?: 0) >= r) return
+        if (r < 2 || (sounded[a.node] ?: 0) >= r) return
         sounded[a.node] = r
         ring(ctx, a)
     }
 
     private fun ring(ctx: Context, a: Alert) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
+        val high = a.level == "HIGH"
         val text = "${a.level.lowercase().replaceFirstChar { it.uppercase() }} alert" + if (a.place.isNotBlank()) " · ${a.place}" else ""
-        nm.notify(a.node.hashCode(), NotificationCompat.Builder(ctx, SIREN).setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle(a.node).setContentText(text).setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX)
-            .setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}")).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(open(ctx)).build())
+        nm.cancel(a.node.hashCode())   // a Medium notification is replaced, not silently updated, when the node reaches High
+        val b = NotificationCompat.Builder(ctx, if (high) SIREN else MEDIUM).setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(a.node).setContentText(text).setAutoCancel(true).setContentIntent(open(ctx))
+        if (high) b.setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX)
+            .setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}")).setOnlyAlertOnce(true)
+        else b.setPriority(NotificationCompat.PRIORITY_DEFAULT).setDefaults(NotificationCompat.DEFAULT_SOUND)
+        nm.notify(a.node.hashCode(), b.build())
     }
 
     fun forget() { sounded.clear() }
