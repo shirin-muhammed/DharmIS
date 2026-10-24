@@ -21,103 +21,88 @@ import androidx.compose.ui.unit.dp
 val ROLES = listOf("RRT member", "Forest Watcher", "Beat Forest Officer", "Section Forest Officer (SFO)", "Deputy Range Officer (station in charge)", "Range Officer (RO)", "Office phone (station or section)")
 private val POST_KEY = mapOf(ROLES[0] to "rrt", ROLES[1] to "watcher", ROLES[2] to "beat", ROLES[3] to "section", ROLES[4] to "dro", ROLES[5] to "range", ROLES[6] to "office")
 
-/** Where the person works, sent with the registration. Staff approve it under Users before it gives any access. */
-class Place(val post: String, val rrtUnit: Boolean, val section: String, val officeKind: String)
+/** What the person chose from the control room's lists (division, range, office, RRT unit). Staff still approve it under Users. */
+class Place(val post: String, val divisionId: Int, val rangeId: Int, val unitId: Int, val rrtUnitId: Int)
+
+class Pick(val id: Int, val name: String, val kind: String = "")
+class RangePick(val id: Int, val name: String, val offices: List<Pick>)
+class DivisionPick(val id: Int, val name: String, val ranges: List<RangePick>, val rrt: List<Pick>)
 
 @Composable
 fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
     var step by remember { mutableIntStateOf(0) }
-    var q by remember { mutableStateOf("") }
-    var range by remember { mutableStateOf<RangeOffice?>(null) }
-    var station by remember { mutableStateOf<String?>(null) }
-    var typedStation by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("") }
     var inRrt by remember { mutableStateOf<Boolean?>(null) }
-    var sectionName by remember { mutableStateOf("") }
-    var officeKind by remember { mutableStateOf("Forest station") }
+    var division by remember { mutableStateOf<DivisionPick?>(null) }
+    var range by remember { mutableStateOf<RangePick?>(null) }
+    var office by remember { mutableStateOf<Pick?>(null) }
+    var rrtUnit by remember { mutableStateOf<Pick?>(null) }
+    var lists by remember { mutableStateOf<List<DivisionPick>?>(null) }
+    var loadError by remember { mutableStateOf("") }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(reload) { loadError = ""; Api.units { l, e -> lists = l; loadError = e } }
     val post = POST_KEY[role] ?: ""
-    val needsPlace = post in setOf("watcher", "beat", "section", "office")
+    // The questions depend on the post: a range officer picks a range, a station phone picks a station, and so on.
+    val steps = buildList {
+        add("you"); add("division")
+        if (post != "rrt") add("range")
+        if (post in setOf("watcher", "beat", "section", "dro", "office")) add("office")
+        if (post == "rrt" || post == "watcher" || post == "beat") add("rrt")
+        add("pin")
+    }
+    val key = steps[step.coerceAtMost(steps.size - 1)]
     var pin by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    fun back() { step = if (step == 4 && !needsPlace) 2 else step - 1 }
-    BackHandler(enabled = step > 0) { back() }
+    BackHandler(enabled = step > 0) { step-- }
+    fun next() { step++ }
+    val titles = mapOf("you" to "About you", "division" to "Your division", "range" to "Your range office", "office" to "Your station or section", "rrt" to "RRT unit", "pin" to "Choose your PIN")
 
     Page {
-        BackBar(
-            when (step) { 0 -> "Your range office"; 1 -> "Your station"; 2 -> "About you"; 3 -> "Your office"; else -> "Choose your PIN" },
-            "Step ${step + 1} of 5",
-            onBack = { if (step > 0) back() },
-        )
+        BackBar(titles[key] ?: "", "Step ${step + 1} of ${steps.size}", onBack = { if (step > 0) step-- })
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (i in 0..4) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
+            for (i in steps.indices) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
         }
         Spacer(Modifier.height(14.dp))
-        when (step) {
-            0 -> {
-                Column(Modifier.padding(horizontal = 20.dp)) {
-                    TextBox(q, "Search range office, division or circle", Icons.Rounded.Search) { q = it }
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.clickable(onClick = onLogin).padding(vertical = 6.dp)) { T("Already registered? ", 15, FontWeight.Medium, pal.ink2); T("Log in", 15, FontWeight.ExtraBold, pal.pri) }
-                }
-                Spacer(Modifier.height(8.dp))
-                val list = remember(q) { Directory.search(q) }
-                if (list.isEmpty()) T("No range office matches “$q”.", 15, FontWeight.Medium, pal.ink3, Modifier.padding(20.dp))
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(list) { r ->
-                        OptionRow(r.name, r.where, Icons.Rounded.Place, range === r, chevron = true) { range = r; station = null; typedStation = ""; step = 1 }
-                    }
-                }
-            }
-            1 -> {
-                val r = range!!
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    T(r.name, 15, FontWeight.Bold, pal.ink2)
-                    r.stations.forEach { s -> OptionRow(s, null, Icons.Rounded.Home, station == s) { station = s; typedStation = ""; step = 2 } }
-                    if (r.stations.isEmpty()) T("This range office has no stations listed. Type yours below.", 14, FontWeight.Medium, pal.ink3)
-                    Spacer(Modifier.height(4.dp))
-                    T("Not in the list?", 14, FontWeight.Bold, pal.ink2)
-                    TextBox(typedStation, "Type your station name") { typedStation = it; station = null }
-                    BigButton("Continue", modifier = Modifier.fillMaxWidth(), enabled = typedStation.isNotBlank()) { step = 2 }
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-            2 -> {
+        when (key) {
+            "you" -> {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Card(Modifier.fillMaxWidth(), bg = pal.pri2, border = null) {
-                        T(station ?: typedStation, 16, FontWeight.ExtraBold, pal.pri)
-                        T("${range!!.name} · ${range!!.division}", 13, FontWeight.Medium, pal.ink2)
-                    }
                     Field("Your name", name, "Full name") { name = it }
                     Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
                     T("Your post", 14, FontWeight.Bold, pal.ink2)
-                    Chips(ROLES, setOf(role)) { role = it }
+                    Chips(ROLES, setOf(role)) { role = it; office = null; inRrt = null; rrtUnit = null }
+                    Row(Modifier.clickable(onClick = onLogin).padding(vertical = 6.dp)) { T("Already registered? ", 15, FontWeight.Medium, pal.ink2); T("Log in", 15, FontWeight.ExtraBold, pal.pri) }
                 }
                 Column(Modifier.padding(20.dp)) {
-                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10 && post.isNotEmpty()) { step = if (needsPlace) 3 else 4 }
+                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10 && post.isNotEmpty()) { next() }
                 }
             }
-            3 -> {
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    if (post == "watcher" || post == "beat") {
-                        T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
-                        T("Only the RRT unit gets elephant alerts. If you work for a station or section, answer No.", 14, FontWeight.Medium, pal.ink2)
-                        Chips(listOf("Yes", "No"), setOf(if (inRrt == true) "Yes" else if (inRrt == false) "No" else "")) { inRrt = it == "Yes" }
-                    }
-                    if (post == "office") {
-                        T("This phone belongs to a", 18, FontWeight.ExtraBold)
-                        Chips(listOf("Forest station", "Section office"), setOf(officeKind)) { officeKind = it }
-                    }
-                    if (post == "section" || (post == "office" && officeKind == "Section office")) {
-                        Field("Name of your section office", sectionName, "e.g. Kuttampuzha section") { sectionName = it }
-                    }
+            "division" -> PickList(lists?.map { Pick(it.id, it.name) }, loadError, "No division has been set up yet. Ask your control room.", { reload++ }) { p ->
+                if (division?.id != p.id) { range = null; office = null; rrtUnit = null }
+                division = lists!!.first { it.id == p.id }; next()
+            }
+            "range" -> PickList(division!!.ranges.map { Pick(it.id, it.name) }, "", "This division has no range office set up yet. Ask your control room.", {}) { p ->
+                if (range?.id != p.id) office = null
+                range = division!!.ranges.first { it.id == p.id }; next()
+            }
+            "office" -> PickList(range!!.offices.filter { o -> when (post) { "section" -> o.kind == "section"; "dro" -> o.kind == "station"; else -> true } }, "", "Nothing is set up here yet. Ask your control room.", {}) { p -> office = p; next() }
+            "rrt" -> Column(Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (post != "rrt") {
+                    T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
+                    T("Only the RRT unit gets elephant alerts. If you work for a station or section, answer No.", 14, FontWeight.Medium, pal.ink2)
+                    Chips(listOf("Yes", "No"), setOf(if (inRrt == true) "Yes" else if (inRrt == false) "No" else "")) { inRrt = it == "Yes"; if (!inRrt!!) rrtUnit = null }
                 }
-                Column(Modifier.padding(20.dp)) {
-                    val ok = when (post) { "watcher", "beat" -> inRrt != null; "section" -> sectionName.isNotBlank(); else -> officeKind == "Forest station" || sectionName.isNotBlank() }
-                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = ok) { step = 4 }
+                if (post == "rrt" || inRrt == true) {
+                    val units = division!!.rrt
+                    if (units.isEmpty()) T("No RRT unit has been set up for this division yet. Ask your control room.", 14, FontWeight.Medium, pal.ink3)
+                    units.forEach { u -> OptionRow(u.name, null, Icons.Rounded.Home, rrtUnit?.id == u.id) { rrtUnit = u } }
                 }
+                Spacer(Modifier.weight(1f))
+                val ok = if (post == "rrt" || inRrt == true) rrtUnit != null else inRrt == false
+                BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = ok) { next() }
+                Spacer(Modifier.height(20.dp))
             }
             else -> {
                 var first by remember { mutableStateOf("") }
@@ -126,7 +111,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 val shown = if (again) pin else first
                 fun finish(p: String) {
                     busy = true; error = ""
-                    Api.signUp(Profile(name.trim(), phone, role, (station ?: typedStation).trim(), range!!), p, Place(post, inRrt == true, sectionName.trim(), if (officeKind == "Section office") "section" else "station")) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
+                    Api.signUp(Profile(name.trim(), phone, role, office?.name ?: rrtUnit?.name ?: "", RangeOffice(range?.name ?: "", "", emptyList(), division!!.name, "")), p, Place(post, division!!.id, range?.id ?: 0, office?.id ?: 0, if (post == "rrt" || inRrt == true) rrtUnit?.id ?: 0 else 0)) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
                 }
                 fun press(d: Char) {
                     if (busy) return
@@ -150,6 +135,20 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** A list of things the control room has built. items null means still loading. */
+@Composable
+private fun ColumnScope.PickList(items: List<Pick>?, error: String, empty: String, retry: () -> Unit, onPick: (Pick) -> Unit) {
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when {
+            error.isNotEmpty() -> { T(error, 15, FontWeight.Bold, pal.red); BigButton("Try again", null, 1, Modifier.fillMaxWidth(), onClick = retry) }
+            items == null -> T("Loading…", 15, FontWeight.Medium, pal.ink3)
+            items.isEmpty() -> T(empty, 15, FontWeight.Medium, pal.ink3)
+            else -> items.forEach { p -> OptionRow(p.name, if (p.kind.isNotEmpty()) p.kind.replaceFirstChar { it.uppercase() } else null, Icons.Rounded.Place, false, chevron = true) { onPick(p) } }
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
 

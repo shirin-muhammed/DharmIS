@@ -40,12 +40,26 @@ object Api {
     /** Registers a new member. done gets null on success (token saved) or a message to show. */
     fun signUp(p: Profile, pin: String, place: Place, done: (String?) -> Unit) {
         thread {
-            val r = call("register", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station)
-                .put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle).put("pin", pin)
-                .put("post", place.post).put("rrt_unit", place.rrtUnit).put("section", place.section).put("office_kind", place.officeKind), "")
+            val r = call("register", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("pin", pin).put("post", place.post)
+                .put("division_id", place.divisionId).put("range_id", place.rangeId).put("unit_id", place.unitId).put("rrt_unit_id", place.rrtUnitId).put("rrt_unit", place.rrtUnitId > 0), "")
             val t = r?.json?.optString("token") ?: ""
             if (r != null && r.code == 200 && t.isNotBlank()) { main.post { Store.setToken(t); Store.saveProfile(p); done(null) } }
             else main.post { done(failText(r)) }
+        }
+    }
+
+    /** The divisions, ranges, offices and RRT units the control room has built; registration offers only these. */
+    fun units(done: (List<DivisionPick>?, String) -> Unit) {
+        thread {
+            val r = call("units", null, "")
+            val arr = r?.json?.optJSONArray("divisions")
+            if (r == null || r.code != 200 || arr == null) { main.post { done(null, failText(r)) }; return@thread }
+            fun picks(a: org.json.JSONArray?) = List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { Pick(it.getInt("id"), it.getString("name"), it.optString("kind")) } }
+            val out = List(arr.length()) { i ->
+                val d = arr.getJSONObject(i); val rs = d.getJSONArray("ranges")
+                DivisionPick(d.getInt("id"), d.getString("name"), List(rs.length()) { j -> rs.getJSONObject(j).let { RangePick(it.getInt("id"), it.getString("name"), picks(it.optJSONArray("offices"))) } }, picks(d.optJSONArray("rrt")))
+            }
+            main.post { done(out, "") }
         }
     }
 
