@@ -34,7 +34,9 @@ object Store {
     val onDuty = mutableStateOf(true)
     /** Post on the server: rrt, watcher, beat get alerts; office (station or section login), section, dro, range get the dashboard instead. */
     val rank = mutableStateOf("rrt")
-    val isOfficer get() = rank.value in setOf("office", "section", "dro", "range")
+    /** False for a watcher or beat officer posted at a station or section: alerts go to the RRT team and office phones only. */
+    val receives = mutableStateOf(true)
+    val isOfficer get() = rank.value in setOf("section", "dro", "range")
     fun setRank(r: String) { if (r.isNotBlank() && r != rank.value) { rank.value = r; sp.edit().putString("rank", r).apply() } }
     val themeMode = mutableStateOf(0) // 0 auto, 1 light, 2 dark
     val reports = mutableStateListOf<Report>()

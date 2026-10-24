@@ -57,7 +57,7 @@ object Api {
             if (r == null || r.code != 200 || m == null || t.isBlank()) { main.post { done(failText(r)) }; return@thread }
             val range = Directory.ranges.firstOrNull { it.name == m.optString("range") && it.division == m.optString("division") } ?: Directory.ranges.firstOrNull { it.name == m.optString("range") }
             val rank = m.optString("rank", "rrt")
-            val office = range ?: if (rank in setOf("office", "section", "dro", "range")) RangeOffice(m.optString("range"), "", emptyList(), m.optString("division"), m.optString("circle")) else null   // officers are set up by staff and may not be in the registration list
+            val office = range ?: if (rank in setOf("section", "dro", "range")) RangeOffice(m.optString("range"), "", emptyList(), m.optString("division"), m.optString("circle")) else null   // officers are set up by staff and may not be in the registration list
             if (office == null) { main.post { done("Your range office is not in this app's list. Call your control room.") }; return@thread }
             main.post { Store.setRank(rank); Store.setToken(t); Store.saveProfile(Profile(m.optString("name"), m.optString("phone"), m.optString("role"), m.optString("station"), office)); done(null) }
         }
@@ -98,6 +98,7 @@ object Api {
                 if (!Store.isOfficer) sendPushToken()
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
+                if (r != null && r.json.has("receives")) { val rv = r.json.optBoolean("receives", true); main.post { Store.receives.value = rv } }
                 if (r != null && r.json.has("rank")) { val rk = r.json.optString("rank"); main.post { Store.setRank(rk) } }
                 if (!Store.isOfficer && r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
                     call("duty", JSONObject().put("on_duty", duty))
