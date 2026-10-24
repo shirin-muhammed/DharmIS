@@ -312,7 +312,7 @@ private fun Command(ro: Ro) {
                 Stat("${ro.sum.getInt("high") + ro.sum.getInt("medium")}", "Alerts", "${ro.sum.getInt("high")} H · ${ro.sum.getInt("medium")} M", Modifier.weight(1f)) { ro.tab("Stations") }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                X("Your stations", 15, FontWeight.Bold, modifier = Modifier.weight(1f))
+                X("Your stations", 15, FontWeight.Bold, m = Modifier.weight(1f))
                 X("See all", 12, FontWeight.SemiBold, V4.acc, Modifier.clickable { ro.tab("Stations") })
             }
             ro.kids.forEach { StationCard(ro, it, false) }
@@ -394,7 +394,7 @@ private fun StationScreen(ro: Ro, name: String, back: () -> Unit) {
 private fun ReportRow(ro: Ro, r: JSONObject) {
     val i = ro.reports.indexOf(r)
     Surf(Modifier.fillMaxWidth(), r = 16, click = { ro.push(Sc.Report(i)) }) {
-        Row { X(r.getString("node"), 14, FontWeight.Bold, modifier = Modifier.weight(1f)); X(hhmm(r.getLong("at")), 12, FontWeight.Medium, V4.mute) }
+        Row { X(r.getString("node"), 14, FontWeight.Bold, m = Modifier.weight(1f)); X(hhmm(r.getLong("at")), 12, FontWeight.Medium, V4.mute) }
         X(reportLine(r).replaceFirstChar { it.uppercase() }, 13, FontWeight.Medium)
         val by = r.s("by"); if (by.isNotBlank()) X(by + if (r.s("office").isNotBlank()) " · " + r.s("office") else "", 12, FontWeight.Medium, V4.mute)
     }
@@ -456,7 +456,7 @@ private fun People(ro: Ro) {
             groups.forEach { (office, ps) ->
                 val d = ps.filter { it.optBoolean("duty", true) }; val o = d.count { it.getBoolean("on_duty") }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row { X(office, 14, FontWeight.Bold, modifier = Modifier.weight(1f)); X("$o of ${d.size} on duty", 12, FontWeight.Medium, V4.mute) }
+                    Row { X(office, 14, FontWeight.Bold, m = Modifier.weight(1f)); X("$o of ${d.size} on duty", 12, FontWeight.Medium, V4.mute) }
                     Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(V4.surf2)) { Box(Modifier.fillMaxWidth(if (d.isNotEmpty()) o.toFloat() / d.size else 0f).fillMaxHeight().background(V4.acc)) }
                     Surf(Modifier.fillMaxWidth()) { ps.forEach { PersonRow(ro, it) } }
                 }
