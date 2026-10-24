@@ -99,6 +99,7 @@ fun App() {
     DharmisTheme(dark) {
         var splash by remember { mutableStateOf(true) }
         var mode2 by remember { mutableIntStateOf(0) }
+        LaunchedEffect(registered) { if (registered) mode2 = 0 }   // after a log out, land on Welcome, not on the last form
         var chat by remember { mutableStateOf<Alert?>(null) }
         var review by remember { mutableStateOf(false) }
         val draft = remember { Draft() }
