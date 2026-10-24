@@ -134,12 +134,17 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (!duty) {
             Card(Modifier.fillMaxWidth(), pad = 24.dp) {
-                Icon(Icons.Rounded.NotificationsOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
-                Spacer(Modifier.height(10.dp))
-                T("You are off duty", 20, FontWeight.ExtraBold)
-                T("You get no alerts, and nothing is saved up to show you later. Switch on duty to receive alerts again.", 14, FontWeight.Medium, pal.ink2)
-                Spacer(Modifier.height(14.dp))
-                BigButton("Go on duty", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth()) { Store.setDuty(true) }
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.size(80.dp).clip(androidx.compose.foundation.shape.CircleShape).background(pal.card2), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.NotificationsOff, null, tint = pal.ink2, modifier = Modifier.size(38.dp)) }
+                    T("You are off duty", 26, FontWeight.ExtraBold, align = androidx.compose.ui.text.style.TextAlign.Center)
+                    T("No alerts, sounds or notifications will reach this phone. Your control room can see that you are off duty.", 15, FontWeight.Medium, pal.ink2, align = androidx.compose.ui.text.style.TextAlign.Center, lh = 22)
+                    BigButton("Go on duty", Icons.Rounded.PowerSettingsNew, modifier = Modifier.fillMaxWidth()) { Store.setDuty(true) }
+                }
+            }
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.amb2).padding(16.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Rounded.NotificationsActive, null, tint = pal.amb, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                T("Alerts raised while you are off duty are not sent to you later. Go on duty before your shift.", 14, FontWeight.Medium, pal.amb, lh = 20)
             }
         } else {
             AlertHealth()
@@ -167,18 +172,22 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                 }
                 else -> alerts.forEach { a ->
                     val lc = levelColors(a.level)
-                    Card(Modifier.fillMaxWidth(), bg = lc.bg, border = lc.main, pad = 18.dp) {
+                    Card(Modifier.fillMaxWidth(), bg = lc.main, border = null, pad = 20.dp) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(lc.main).padding(horizontal = 8.dp, vertical = 2.dp)) { T(a.level, 11, FontWeight.ExtraBold, lc.on) }
-                            Spacer(Modifier.width(8.dp)); T(ago(a.since), 13, FontWeight.Bold, lc.text)
+                            Box(Modifier.clip(RoundedCornerShape(8.dp)).background(lc.on).padding(horizontal = 10.dp, vertical = 4.dp)) { T(a.level + " ALERT", 12, FontWeight.ExtraBold, lc.main) }
+                            Spacer(Modifier.width(10.dp)); T("since " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(a.since)), 13, FontWeight.SemiBold, lc.on)
                         }
-                        Spacer(Modifier.height(8.dp))
-                        T(a.node, 24, FontWeight.ExtraBold, lc.text)
-                        if (a.place.isNotBlank()) T(a.place, 15, FontWeight.Medium, pal.ink2)
+                        Spacer(Modifier.height(10.dp))
+                        T(a.node, 34, FontWeight.ExtraBold, lc.on)
+                        if (a.place.isNotBlank()) T(a.place, 15, FontWeight.Medium, lc.on, lh = 22)
                         Spacer(Modifier.height(14.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (a.hasPos) BigButton("Go", Icons.Rounded.Navigation, 1, Modifier.weight(1f)) { onGo(a) }
-                            BigButton("Report now", Icons.Rounded.Edit, 2, Modifier.weight(2f)) { onReport(a) }
+                            if (a.hasPos) Row(Modifier.height(56.dp).clip(RoundedCornerShape(28.dp)).background(lc.on).clickable { onGo(a) }.padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Navigation, null, tint = lc.main, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); T("Go", 17, FontWeight.Bold, lc.main)
+                            }
+                            Row(Modifier.weight(1f).height(56.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF11201A)).clickable { onReport(a) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Edit, null, tint = Color.White, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); T("Report now", 17, FontWeight.Bold, Color.White)
+                            }
                         }
                     }
                 }
@@ -244,9 +253,11 @@ private fun ReportDetail(id: String, onBack: () -> Unit) {
 @Composable
 private fun DutyRow() {
     val duty by Store.onDuty
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(pal.card).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) { T("On duty", 17, FontWeight.Bold); T(if (duty) "You receive alerts" else "No alerts at all", 13, FontWeight.Medium, pal.ink3) }
-        Switch(duty, { Store.setDuty(it) }, colors = SwitchDefaults.colors(checkedTrackColor = pal.pri))
+    Card(Modifier.fillMaxWidth(), pad = 16.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { T("On duty", 17, FontWeight.Bold); T("Switch off to stop all alerts", 13, FontWeight.Medium, pal.ink3) }
+            Switch(duty, { Store.setDuty(it) }, colors = SwitchDefaults.colors(checkedTrackColor = pal.grn, checkedThumbColor = Color.White))
+        }
     }
 }
 
@@ -255,37 +266,44 @@ private fun Me() {
     val ctx = LocalContext.current
     val p = Store.profile.value ?: return
     val mode by Store.themeMode
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        T("Me", 26, FontWeight.ExtraBold)
-        Card(Modifier.fillMaxWidth(), pad = 18.dp) {
-            T(p.name, 20, FontWeight.ExtraBold)
-            T(p.role, 14, FontWeight.Medium, pal.ink2)
-            Spacer(Modifier.height(8.dp))
-            T("${p.station} · ${p.range.name}", 14, FontWeight.Bold)
-            T("${p.range.division} · ${p.range.circle}", 13, FontWeight.Medium, pal.ink3)
-            T("+91 ${p.phone}", 13, FontWeight.Medium, pal.ink3)
-        }
-        if (p.range.phone.isNotBlank()) BigButton("Call the range office", Icons.Rounded.Call, 1, Modifier.fillMaxWidth()) {
-            ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.range.phone)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-        if (!Store.receives.value && Store.rank.value !in setOf("section", "dro", "range")) Card(Modifier.fillMaxWidth(), pad = 18.dp) {
-            T("Alerts are not for your post", 17, FontWeight.ExtraBold)
-            T("The alert screen is for the RRT unit and for station and section office phones. Your control room can add you to the RRT unit.", 14, FontWeight.Medium, pal.ink2)
-        }
-        if (Store.alertUser && Store.receives.value) DutyRow()
-        Card(Modifier.fillMaxWidth(), pad = 16.dp) {
-            T("Appearance", 13, FontWeight.Bold, pal.ink3)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card2).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                listOf("Auto", "Light", "Dark").forEachIndexed { i, l ->
-                    Box(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(12.dp)).background(if (mode == i) pal.pri else Color.Transparent).clickable { Store.setTheme(i) }, contentAlignment = Alignment.Center) { T(l, 14, FontWeight.Bold, if (mode == i) pal.onPri else pal.ink2) }
+    var confirm by remember { mutableStateOf(false) }
+    val sun = remember { sunTimes(10.5, 76.5, System.currentTimeMillis()) }
+    fun clock(t: Long) = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(t)).lowercase()
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            T("Me", 26, FontWeight.ExtraBold)
+            Card(Modifier.fillMaxWidth(), pad = 16.dp) {
+                T(p.name, 18, FontWeight.ExtraBold)
+                T("+91 ${p.phone}", 14, FontWeight.Medium)
+                T("${p.station} · ${p.range.name}", 13, FontWeight.Medium, pal.ink3)
+                T("${p.range.division} · ${p.range.circle}", 13, FontWeight.Medium, pal.ink3)
+            }
+            if (!Store.receives.value && Store.rank.value !in setOf("section", "dro", "range")) Card(Modifier.fillMaxWidth(), pad = 18.dp) {
+                T("Alerts are not for your post", 17, FontWeight.ExtraBold)
+                T("The alert screen is for the RRT unit and for station and section office phones. Your control room can add you to the RRT unit.", 14, FontWeight.Medium, pal.ink2)
+            }
+            if (Store.alertUser && Store.receives.value) DutyRow()
+            Card(Modifier.fillMaxWidth(), pad = 16.dp) {
+                T("Appearance", 13, FontWeight.SemiBold, pal.ink3)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card2).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("Auto" to Icons.Rounded.BrightnessAuto, "Light" to Icons.Rounded.LightMode, "Dark" to Icons.Rounded.DarkMode).forEachIndexed { i, (l, ic) ->
+                        Row(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(12.dp)).background(if (mode == i) pal.pri else Color.Transparent).clickable { Store.setTheme(i) }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            Icon(ic, null, tint = if (mode == i) pal.onPri else pal.ink2, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); T(l, 14, FontWeight.Bold, if (mode == i) pal.onPri else pal.ink2)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                T(if (sun != null) "Auto turns dark at sunset (${clock(sun.second)} today) and light at sunrise (${clock(sun.first)}) for your station. Worked out on the phone, so it needs no signal." else "Auto turns dark at sunset and light at sunrise.", 13, FontWeight.Medium, pal.ink2, lh = 19)
+            }
+            if (p.range.phone.isNotBlank()) Card(Modifier.fillMaxWidth().clickable { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.range.phone)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }, pad = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Call, null, tint = pal.pri, modifier = Modifier.size(24.dp)); Spacer(Modifier.width(12.dp))
+                    Column { T("Call your range office", 17, FontWeight.Bold); T("${p.range.name} · ${p.range.phone}", 13, FontWeight.Medium, pal.ink3) }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            T("Auto turns dark at sunset and light at sunrise.", 12, FontWeight.Medium, pal.ink2)
         }
-        var confirm by remember { mutableStateOf(false) }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
         BigButton("Sign out", Icons.Rounded.Logout, 1, Modifier.fillMaxWidth()) { confirm = true }
         if (confirm) {
             val unsent = Store.reports.count { !it.sent }
@@ -297,10 +315,8 @@ private fun Me() {
                 dismissButton = { TextButton(onClick = { confirm = false }) { Text("Stay logged in") } },
             )
         }
-        T("DharmIS 0.1 · OCAANA", 12, FontWeight.Medium, pal.ink3)
     }
 }
-
 
 /** Figma app bar: logo avatar, name and place, and the tap-to-toggle duty pill for anyone who gets alerts. */
 @Composable
