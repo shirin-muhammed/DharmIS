@@ -201,7 +201,7 @@ fun Welcome(onLogin: () -> Unit, onRegister: () -> Unit) {
                 WelcomeButton("Register", androidx.compose.ui.graphics.Color.White, androidx.compose.ui.graphics.Color(0xFF17261E), androidx.compose.ui.graphics.Color(0xFFDCD6C8), onRegister)
             }
         }
-        T("OCAANA by tagit · Kerala Forest Department", 12, FontWeight.Medium, soft, Modifier.padding(vertical = 20.dp))
+        T("OCAANA by ONTAGO · Kerala Forest Department", 12, FontWeight.Medium, soft, Modifier.padding(vertical = 20.dp))
     }
 }
 
