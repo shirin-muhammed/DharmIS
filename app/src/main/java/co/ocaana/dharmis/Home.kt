@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -50,7 +51,7 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     if (open != null) { ReportDetail(open!!) { open = null }; return }
     if (Store.serverStatus.value == "pending") { WaitingScreen(); return }
     Page(header = false) {
-        HomeBar(officer)
+        HomeBar(officer, dash)
         Box(Modifier.weight(1f)) {
             when {
                 limited -> Me()
@@ -320,14 +321,16 @@ private fun Me() {
 
 /** Figma app bar: logo avatar, name and place, and the tap-to-toggle duty pill for anyone who gets alerts. */
 @Composable
-private fun HomeBar(officer: Boolean) {
+private fun HomeBar(officer: Boolean, dash: DashState) {
     val ctx = LocalContext.current
     val logo = remember { android.graphics.BitmapFactory.decodeStream(ctx.assets.open("logo.png"), null, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 })!!.asImageBitmap() }
     val p = Store.profile.value
     val duty by Store.onDuty
-    val title = if (officer) p?.name ?: "" else p?.let { it.station.ifBlank { it.range.name } } ?: ""
-    val sub = if (officer) listOf(p?.role ?: "", (p?.station ?: "").ifBlank { p?.range?.name ?: "" }).filter { it.isNotBlank() }.joinToString(" · ") else p?.range?.name ?: ""
+    val open = if (officer && dash.tab == "Dashboard") dash.openOffice() else null
+    val title = if (open != null) open.first else if (officer) p?.name ?: "" else p?.let { it.station.ifBlank { it.range.name } } ?: ""
+    val sub = if (open != null) open.second else if (officer) listOf(p?.role ?: "", (p?.station ?: "").ifBlank { p?.range?.name ?: "" }).filter { it.isNotBlank() }.joinToString(" · ") else p?.range?.name ?: ""
     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (open != null) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = pal.ink, modifier = Modifier.size(28.dp).clickable { dash.stack = dash.stack.dropLast(1) }); Spacer(Modifier.width(8.dp)) }
         Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF11201A)), contentAlignment = Alignment.Center) {
             androidx.compose.foundation.Image(logo, "OCAANA", Modifier.size(32.dp))
         }

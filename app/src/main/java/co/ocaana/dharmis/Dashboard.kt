@@ -6,6 +6,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -36,16 +38,22 @@ private fun postName(p: String) = when (p) {
 
 private fun kindName(k: String) = when (k) { "division" -> "Division"; "range" -> "Range"; "section" -> "Section office"; "station" -> "Forest station"; "rrt" -> "RRT unit"; else -> k }
 
-/** Level colours for a node; offline or silent nodes are grey. */
-@Composable
-private fun nodeColors(level: String): LevelColors =
-    if (level in setOf("high", "medium", "low", "safe")) levelColors(level.uppercase()) else LevelColors(pal.ink3, pal.card2, pal.ink3, pal.bg)
+private fun levelWord(l: String) = when (l) { "high" -> "High"; "medium" -> "Medium"; "low" -> "Low"; "safe" -> "Safe"; else -> "No signal" }
 
 @Composable
-private fun Tile(value: String, label: String, lc: LevelColors?, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(lc?.bg ?: pal.card).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp)) {
-        T(value, 26, FontWeight.ExtraBold, lc?.text ?: pal.ink)
-        T(label, 12, FontWeight.Bold, lc?.text ?: pal.ink3)
+private fun levelColor(l: String): Color = when (l) { "high" -> pal.red; "medium" -> pal.amb; "low" -> pal.amb; "safe" -> pal.grn; else -> pal.ink3 }
+
+@Composable
+private fun Head(title: String, sub: String) { Column { T(title, 28, FontWeight.ExtraBold); T(sub, 13, FontWeight.Medium, pal.ink3) } }
+
+@Composable
+private fun Sect(t: String) = T(t, 14, FontWeight.Bold, pal.ink2)
+
+@Composable
+private fun Stat(label: String, num: Int, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(16.dp)).background(pal.card).border(BorderStroke(1.dp, pal.line), RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(8.dp).clip(CircleShape).background(color)); Spacer(Modifier.width(6.dp)); T(label, 12, FontWeight.SemiBold, pal.ink2) }
+        T("$num", 30, FontWeight.ExtraBold, if (color == pal.ink3) pal.ink else color)
     }
 }
 
@@ -85,65 +93,50 @@ private fun TabPage(s: DashState, content: @Composable ColumnScope.(JSONObject) 
     }
 }
 
-/** Cards for the office; a Deputy Range Officer or SFO also sees the team below. Drilled into a station or section it shows only the live nodes and the team. */
+/** Cards for the office; a Deputy Range Officer or SFO also sees live nodes and the team below. Drilled into a station or section it shows only the live nodes and the team. */
 @Composable
 fun DashboardTab(s: DashState, rrtOfficer: Boolean) = TabPage(s) { d ->
     val u = d.getJSONObject("unit"); val sm = d.getJSONObject("summary")
-    val crumbs = d.getJSONArray("crumbs").items()
     val nodes = d.getJSONArray("nodes").items()
     val people = d.getJSONArray("people").items()
     val drilled = s.stack.isNotEmpty()
     val officeView = u.getString("kind") in setOf("station", "section")
-    if (drilled) T("‹ Back to " + (crumbs.getOrNull(crumbs.size - 2)?.optString("name") ?: "your office"), 14, FontWeight.Bold, pal.pri, Modifier.clickable { s.stack = s.stack.dropLast(1) }.padding(vertical = 4.dp))
-    else Store.profile.value?.let { T(it.name + " · " + postName(Store.rank.value), 13, FontWeight.Bold, pal.ink2) }
-    T(u.getString("name"), 26, FontWeight.ExtraBold)
-    T(kindName(u.getString("kind")) + if (crumbs.size > 1) " · " + crumbs.dropLast(1).joinToString(" › ") { it.optString("name") } else "", 13, FontWeight.Medium, pal.ink3)
     if (s.err != null) T("Not updated: ${s.err}", 12, FontWeight.Bold, pal.amb)
 
     fun open(tab: String, filter: String = "All") { s.filter = filter; s.tab = tab }
     if (!(drilled && officeView)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Tile("${sm.getInt("nodes")}", "Nodes", null, Modifier.weight(1f)) { open("Nodes") }
-            Tile("${sm.getInt("high")}", "High", if (sm.getInt("high") > 0) levelColors("HIGH") else null, Modifier.weight(1f)) { open("Nodes", "High") }
-            Tile("${sm.getInt("medium")}", "Medium", if (sm.getInt("medium") > 0) levelColors("MEDIUM") else null, Modifier.weight(1f)) { open("Nodes", "Medium") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Tile("${sm.getInt("on_duty")} / ${sm.getInt("people")}", "On duty", null, Modifier.weight(1f)) { if (!rrtOfficer) open("On duty") }
-            Tile("${sm.getInt("reports24")}", "Reports", null, Modifier.weight(1f)) { open("Reports") }
-            Tile("${sm.getInt("offline")}", "No signal", null, Modifier.weight(1f)) { open("Nodes", "No signal") }
+        val cards = listOf(
+            Triple("Nodes", sm.getInt("nodes"), pal.ink) to { open("Nodes") },
+            Triple("High", sm.getInt("high"), pal.red) to { open("Nodes", "High") },
+            Triple("Medium", sm.getInt("medium"), pal.amb) to { open("Nodes", "Medium") },
+            Triple("No signal", sm.getInt("offline"), pal.ink3) to { open("Nodes", "No signal") },
+            Triple("Reports today", sm.getInt("reports24"), pal.pri) to { open("Reports") },
+            Triple("On duty", sm.getInt("on_duty"), pal.grn) to { if (!rrtOfficer) open("On duty") },
+        )
+        cards.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { row.forEach { (c, go) -> Stat(c.first, c.second, c.third, Modifier.weight(1f), go) } }
         }
     }
 
     val kids = d.getJSONArray("children").items()
     if (kids.isNotEmpty()) {
-        T("Offices", 16, FontWeight.ExtraBold)
+        Sect("Offices")
         kids.forEach { k ->
-            val worst = if (k.getInt("high") > 0) "high" else if (k.getInt("medium") > 0) "medium" else if (k.getInt("low") > 0) "low" else if (k.getInt("safe") > 0) "safe" else "offline"
-            val lc = nodeColors(worst)
-            Card(Modifier.fillMaxWidth().clickable { s.stack = s.stack + k.getInt("id") }, pad = 14.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(12.dp).clip(CircleShape).background(lc.main))
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        T(k.getString("name"), 17, FontWeight.ExtraBold)
-                        T(kindName(k.getString("kind")), 12, FontWeight.Medium, pal.ink3)
-                        T("${k.getInt("nodes")} nodes · ${k.getInt("high")} high · ${k.getInt("medium")} medium · ${k.getInt("on_duty")}/${k.getInt("people")} on duty · ${k.getInt("reports24")} reports today", 13, FontWeight.Medium, pal.ink2)
-                    }
-                    Icon(Icons.Rounded.ChevronRight, null, tint = pal.ink3)
-                }
+            val sub = if (k.getInt("high") > 0) "${k.getInt("nodes")} nodes · ${k.getInt("high")} High" else if (k.getInt("medium") > 0) "${k.getInt("nodes")} nodes · ${k.getInt("medium")} Medium" else "${k.getInt("nodes")} nodes · all clear"
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card).border(BorderStroke(1.dp, pal.line), RoundedCornerShape(16.dp)).clickable { s.stack = s.stack + k.getInt("id") }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) { T(k.getString("name"), 15, FontWeight.Bold); T(sub, 12, FontWeight.Medium, pal.ink3) }
+                Icon(Icons.Rounded.ChevronRight, null, tint = pal.ink3)
             }
         }
     }
 
-    if (drilled && officeView) {
-        T("Live nodes", 16, FontWeight.ExtraBold)
+    if (officeView) {
+        Sect("Live nodes")
         if (nodes.isEmpty()) T("No nodes are set for this office yet.", 14, FontWeight.Medium, pal.ink3)
         nodes.forEach { NodeCard(it) }
-    }
-    if (officeView) {
-        T("Team", 16, FontWeight.ExtraBold)
+        Sect("Team")
         if (people.isEmpty()) T("No one is registered under this office yet.", 14, FontWeight.Medium, pal.ink3)
-        people.forEach { PersonRow(it) }
+        people.forEach { PersonRow(it, u.getString("name")) }
     }
 }
 
@@ -151,19 +144,25 @@ fun DashboardTab(s: DashState, rrtOfficer: Boolean) = TabPage(s) { d ->
 @Composable
 fun NodesTab(s: DashState) {
     Column(Modifier.fillMaxSize()) {
-        val filters = listOf("All", "High", "Medium", "No signal")
+        val d = s.data
+        val all = d?.getJSONArray("nodes").items()
+        fun count(l: String?) = all.count { l == null || it.getString("level") == l }
+        val filters = listOf("All" to count(null), "High" to count("high"), "Medium" to count("medium"), "No signal" to count("offline"))
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Head("Nodes", "Across " + (d?.getJSONObject("unit")?.getString("name") ?: ""))
+        }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            filters.forEach { f ->
+            filters.forEach { (f, n) ->
                 val on = s.filter == f
-                Box(Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(if (on) pal.pri else pal.card).clickable { s.filter = f }.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
-                    T(f, 14, FontWeight.Bold, if (on) pal.bg else pal.ink2)
+                Row(Modifier.clip(RoundedCornerShape(18.dp)).background(if (on) pal.pri else pal.card2).clickable { s.filter = f }.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    T(f, 13, FontWeight.Bold, if (on) pal.onPri else pal.ink2); Spacer(Modifier.width(6.dp)); T("$n", 13, FontWeight.Medium, if (on) pal.onPri else pal.ink3)
                 }
             }
         }
         Box(Modifier.weight(1f)) {
-            TabPage(s) { d ->
+            TabPage(s) { dd ->
                 val want = when (s.filter) { "High" -> "high"; "Medium" -> "medium"; "No signal" -> "offline"; else -> null }
-                val list = d.getJSONArray("nodes").items().filter { want == null || it.getString("level") == want }
+                val list = dd.getJSONArray("nodes").items().filter { want == null || it.getString("level") == want }
                 if (list.isEmpty()) T("Nothing here.", 14, FontWeight.Medium, pal.ink3)
                 list.forEach { NodeCard(it) }
             }
@@ -174,6 +173,7 @@ fun NodesTab(s: DashState) {
 @Composable
 fun ReportsTab(s: DashState) = TabPage(s) { d ->
     val list = d.getJSONArray("reports").items()
+    Head("Reports", "Today · ${d.getJSONObject("summary").getInt("reports24")} reports")
     if (list.isEmpty()) T("No reports yet.", 14, FontWeight.Medium, pal.ink3)
     list.forEach { ReportCard(it) }
 }
@@ -181,43 +181,56 @@ fun ReportsTab(s: DashState) = TabPage(s) { d ->
 @Composable
 fun DutyTab(s: DashState) = TabPage(s) { d ->
     val on = d.getJSONArray("people").items().filter { it.getBoolean("on_duty") }
+    Head("On duty", "${on.size} people on duty now")
     if (on.isEmpty()) T("No one is on duty.", 14, FontWeight.Medium, pal.ink3)
-    on.forEach { PersonRow(it) }
+    on.forEach { PersonRow(it, d.getJSONObject("unit").getString("name")) }
+}
+
+/** What the app bar shows while an office is open below the officer's own: its name, and the office above it. */
+fun DashState.openOffice(): Pair<String, String>? {
+    val d = data ?: return null
+    if (stack.isEmpty()) return null
+    val crumbs = d.getJSONArray("crumbs").items()
+    return d.getJSONObject("unit").getString("name") to (crumbs.getOrNull(crumbs.size - 2)?.optString("name") ?: "")
 }
 
 @Composable
 private fun NodeCard(n: JSONObject) {
-    val level = n.getString("level"); val lc = nodeColors(level)
-    Card(Modifier.fillMaxWidth(), bg = lc.bg, border = lc.main, pad = 12.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                T(n.getString("id"), 16, FontWeight.ExtraBold, lc.text)
-                val place = n.optString("place"); if (place.isNotBlank()) T(place, 13, FontWeight.Medium, pal.ink2)
-                if (!n.isNull("age")) T("Last signal " + ago(System.currentTimeMillis() - n.getLong("age") * 1000), 12, FontWeight.Medium, pal.ink3)
-            }
-            Box(Modifier.clip(RoundedCornerShape(6.dp)).background(lc.main).padding(horizontal = 8.dp, vertical = 2.dp)) { T(if (level == "offline") "NO SIGNAL" else level.uppercase(), 11, FontWeight.ExtraBold, lc.on) }
+    val level = n.getString("level"); val c = levelColor(level)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card).border(BorderStroke(1.dp, pal.line), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(12.dp).clip(CircleShape).background(c)); Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            T(n.getString("id"), 15, FontWeight.Bold)
+            val place = n.optString("place"); if (place.isNotBlank()) T(place, 12, FontWeight.Medium, pal.ink3)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            T(levelWord(level), 13, FontWeight.Bold, c)
+            if (!n.isNull("age")) T(java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(System.currentTimeMillis() - n.getLong("age") * 1000)), 12, FontWeight.Medium, pal.ink3)
         }
     }
 }
 
 @Composable
 private fun ReportCard(r: JSONObject) {
-    Card(Modifier.fillMaxWidth(), pad = 12.dp) {
-        T("${r.getString("node")} · ${if (r.getInt("herd") > 0) "${r.getInt("herd")} elephants" else "No elephants"}", 15, FontWeight.ExtraBold)
-        T(ago(r.getLong("at") * 1000) + if (r.optString("by").isNotBlank() && r.optString("by") != "null") " · ${r.optString("by")}" else "", 12, FontWeight.Medium, pal.ink3)
-        if (r.optString("note").isNotBlank()) T(r.optString("note"), 13, FontWeight.Medium, pal.ink2)
+    Card(Modifier.fillMaxWidth(), pad = 14.dp) {
+        Row { T(r.getString("node"), 15, FontWeight.Bold, modifier = Modifier.weight(1f)); T(java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(r.getLong("at") * 1000)), 12, FontWeight.Medium, pal.ink3) }
+        Spacer(Modifier.height(4.dp))
+        T((if (r.getInt("herd") > 0) "${r.getInt("herd")} elephants" else "No elephants") + if (r.optString("note").isNotBlank() && r.optString("note") != "null") ". " + r.optString("note") else "", 13, FontWeight.Medium, lh = 19)
+        if (r.optString("by").isNotBlank() && r.optString("by") != "null") T(r.optString("by"), 12, FontWeight.Medium, pal.ink3)
     }
 }
 
 @Composable
-private fun PersonRow(p: JSONObject) {
+private fun PersonRow(p: JSONObject, place: String) {
     val ctx = LocalContext.current
     val duty = p.optBoolean("duty", true)   // officers have no duty status
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(pal.card).clickable {
+    val name = p.getString("name")
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card).border(BorderStroke(1.dp, pal.line), RoundedCornerShape(16.dp)).clickable {
         ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.getString("phone"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (duty) { Box(Modifier.size(10.dp).clip(CircleShape).background(if (p.getBoolean("on_duty")) pal.grn else pal.line)); Spacer(Modifier.width(10.dp)) }
-        Column(Modifier.weight(1f)) { T(p.getString("name"), 15, FontWeight.Bold); T(postName(p.getString("post")) + if (!duty) "" else if (p.getBoolean("on_duty")) " · on duty" else " · off duty", 12, FontWeight.Medium, pal.ink3) }
-        Icon(Icons.Rounded.Call, null, tint = pal.pri)
+    }.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(36.dp).clip(CircleShape).background(pal.pri2), contentAlignment = Alignment.Center) { T(name.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1).uppercase() }, 13, FontWeight.Bold, pal.pri) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) { T(name, 15, FontWeight.Bold); T(postName(p.getString("post")) + " · " + place, 12, FontWeight.Medium, pal.ink3) }
+        if (duty && p.getBoolean("on_duty")) Box(Modifier.size(10.dp).clip(CircleShape).background(pal.grn))
     }
 }
