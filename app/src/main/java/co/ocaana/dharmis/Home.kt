@@ -44,25 +44,31 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     val officer = Store.rank.value in setOf("section", "dro", "range")
     val rrtOfficer = officer && Store.inRrt.value
     val limited = !officer && !Store.receives.value   // a watcher or beat officer posted at a station or section: not in the RRT unit
+    val dash = rememberDash(officer)
     BackHandler(enabled = open != null) { open = null }
     if (open != null) { ReportDetail(open!!) { open = null }; return }
     Page {
         Box(Modifier.weight(1f)) {
             when {
                 limited -> Me()
-                officer && tab == 0 -> Dashboard()
-                rrtOfficer && tab == 1 -> Alerts(onReport, onGo)
-                rrtOfficer && tab == 2 -> Reports { open = it }
-                officer -> Me()
+                officer -> when (dash.tab) {
+                    "Dashboard" -> DashboardTab(dash, rrtOfficer)
+                    "Nodes" -> NodesTab(dash)
+                    "Reports" -> ReportsTab(dash)
+                    "On duty" -> DutyTab(dash)
+                    "Alerts" -> Alerts(onReport, onGo)
+                    else -> Me()
+                }
                 tab == 0 -> Alerts(onReport, onGo)
                 tab == 1 -> Reports { open = it }
                 else -> Me()
             }
         }
         if (!limited) Row(Modifier.fillMaxWidth().background(pal.card).padding(vertical = 6.dp)) {
-            (if (rrtOfficer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Alerts", Icons.Rounded.NotificationsActive, 1), Triple("Reports", Icons.Rounded.Description, 2), Triple("Me", Icons.Rounded.Person, 3))
-            else if (officer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Me", Icons.Rounded.Person, 1))
-            else listOf(Triple("Alerts", Icons.Rounded.NotificationsActive, 0), Triple("Reports", Icons.Rounded.Description, 1), Triple("Me", Icons.Rounded.Person, 2))).forEach { (l, ic, i) ->
+            if (officer) officerTabs(rrtOfficer).forEach { l ->
+                NavItem(l, when (l) { "Dashboard" -> Icons.Rounded.Dashboard; "Nodes" -> Icons.Rounded.Sensors; "Reports" -> Icons.Rounded.Description; "On duty" -> Icons.Rounded.Groups; "Alerts" -> Icons.Rounded.NotificationsActive; else -> Icons.Rounded.Person }, dash.tab == l, Modifier.weight(1f)) { dash.tab = l }
+            }
+            else listOf(Triple("Alerts", Icons.Rounded.NotificationsActive, 0), Triple("Reports", Icons.Rounded.Description, 1), Triple("Me", Icons.Rounded.Person, 2)).forEach { (l, ic, i) ->
                 NavItem(l, ic, tab == i, Modifier.weight(1f)) { tab = i }
             }
         }
