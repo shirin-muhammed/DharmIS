@@ -50,6 +50,7 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     BackHandler(enabled = open != null) { open = null }
     if (open != null) { ReportDetail(open!!) { open = null }; return }
     if (Store.serverStatus.value == "pending") { WaitingScreen(); return }
+    if (Store.rank.value == "range" && !rrtOfficer) { RoApp(dash); return }   // Range Officer: the v4 Figma design
     Page(header = false) {
         HomeBar(officer, dash)
         Box(Modifier.weight(1f)) {
