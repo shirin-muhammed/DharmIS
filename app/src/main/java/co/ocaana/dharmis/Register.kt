@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-val ROLES = listOf("RRT member", "Forest Watcher", "Beat Forest Officer", "Section Forest Officer (SFO)", "Deputy Range Officer (station in charge)", "Range Officer (RO)", "Office phone (station or section)")
+val ROLES = listOf("RRT Member", "Forest Watcher", "Beat Forest Officer", "Section Forest Officer", "Deputy Range Officer", "Range Officer", "Office Phone")
 private val POST_KEY = mapOf(ROLES[0] to "rrt", ROLES[1] to "watcher", ROLES[2] to "beat", ROLES[3] to "section", ROLES[4] to "dro", ROLES[5] to "range", ROLES[6] to "office")
 
 /** What the person chose from the control room's lists (division, range, office, RRT unit). Staff still approve it under Users. */
@@ -46,11 +46,11 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
     val post = POST_KEY[role] ?: ""
     // The questions depend on the post: a range officer picks a range, a station phone picks a station, and so on.
     val steps = buildList {
-        add("you"); add("division")
+        add("post"); add("division")
         if (post != "rrt") add("range")
         if (post in setOf("watcher", "beat", "section", "dro", "office")) add("office")
         if (post == "rrt" || post == "watcher" || post == "beat") add("rrt")
-        add("pin")
+        add("you"); add("pin")
     }
     val key = steps[step.coerceAtMost(steps.size - 1)]
     var pin by remember { mutableStateOf("") }
@@ -58,7 +58,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
     var error by remember { mutableStateOf("") }
     BackHandler(enabled = step > 0) { step-- }
     fun next() { step++ }
-    val titles = mapOf("you" to "About you", "division" to "Your division", "range" to "Your range office", "office" to "Your station or section", "rrt" to "RRT unit", "pin" to "Choose your PIN")
+    val titles = mapOf("post" to "Who are you", "you" to if (post == "office") "Office phone number" else "About you", "division" to "Your division", "range" to "Your range office", "office" to if (post == "office") "Which office" else "Your station or section", "rrt" to "RRT unit", "pin" to "Choose your PIN")
 
     Page {
         BackBar(titles[key] ?: "", "Step ${step + 1} of ${steps.size}", onBack = { if (step > 0) step-- })
@@ -67,16 +67,19 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
         }
         Spacer(Modifier.height(14.dp))
         when (key) {
+            "post" -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ROLES.forEach { r -> OptionRow(r, null, null, role == r, chevron = true) { if (role != r) { office = null; inRrt = null; rrtUnit = null }; role = r; next() } }
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.clickable(onClick = onLogin).padding(vertical = 6.dp)) { T("Already registered? ", 15, FontWeight.Medium, pal.ink2); T("Log in", 15, FontWeight.ExtraBold, pal.pri) }
+                Spacer(Modifier.height(12.dp))
+            }
             "you" -> {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Field("Your name", name, "Full name") { name = it }
-                    Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
-                    T("Your post", 14, FontWeight.Bold, pal.ink2)
-                    Chips(ROLES, setOf(role)) { role = it; office = null; inRrt = null; rrtUnit = null }
-                    Row(Modifier.clickable(onClick = onLogin).padding(vertical = 6.dp)) { T("Already registered? ", 15, FontWeight.Medium, pal.ink2); T("Log in", 15, FontWeight.ExtraBold, pal.pri) }
+                    if (post == "office") T(office?.name ?: "", 18, FontWeight.ExtraBold) else Field("Your name", name, "Full name") { name = it }
+                    Field(if (post == "office") "Office mobile number" else "Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
                 }
                 Column(Modifier.padding(20.dp)) {
-                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10 && post.isNotEmpty()) { next() }
+                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = (post == "office" || name.isNotBlank()) && phone.length == 10) { next() }
                 }
             }
             "division" -> PickList(lists?.map { Pick(it.id, it.name) }, loadError, "No division has been set up yet. Ask your control room.", { reload++ }) { p ->
@@ -92,12 +95,13 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 if (post != "rrt") {
                     T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
                     T("Only the RRT unit gets elephant alerts. If you work for a station or section, answer No.", 14, FontWeight.Medium, pal.ink2)
-                    Chips(listOf("Yes", "No"), setOf(if (inRrt == true) "Yes" else if (inRrt == false) "No" else "")) { inRrt = it == "Yes"; if (!inRrt!!) rrtUnit = null }
+                    OptionRow("Yes", null, null, inRrt == true) { inRrt = true }
+                    OptionRow("No", null, null, inRrt == false) { inRrt = false; rrtUnit = null }
                 }
                 if (post == "rrt" || inRrt == true) {
                     val units = division!!.rrt
                     if (units.isEmpty()) T("No RRT unit has been set up for this division yet. Ask your control room.", 14, FontWeight.Medium, pal.ink3)
-                    units.forEach { u -> OptionRow(u.name, null, Icons.Rounded.Home, rrtUnit?.id == u.id) { rrtUnit = u } }
+                    units.forEach { u -> OptionRow(u.name, null, null, rrtUnit?.id == u.id) { rrtUnit = u } }
                 }
                 Spacer(Modifier.weight(1f))
                 val ok = if (post == "rrt" || inRrt == true) rrtUnit != null else inRrt == false
@@ -111,7 +115,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 val shown = if (again) pin else first
                 fun finish(p: String) {
                     busy = true; error = ""
-                    Api.signUp(Profile(name.trim(), phone, role, office?.name ?: rrtUnit?.name ?: "", RangeOffice(range?.name ?: "", "", emptyList(), division!!.name, "")), p, Place(post, division!!.id, range?.id ?: 0, office?.id ?: 0, if (post == "rrt" || inRrt == true) rrtUnit?.id ?: 0 else 0)) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
+                    Api.signUp(Profile(if (post == "office") office!!.name else name.trim(), phone, role, office?.name ?: rrtUnit?.name ?: "", RangeOffice(range?.name ?: "", "", emptyList(), division!!.name, "")), p, Place(post, division!!.id, range?.id ?: 0, office?.id ?: 0, if (post == "rrt" || inRrt == true) rrtUnit?.id ?: 0 else 0)) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
                 }
                 fun press(d: Char) {
                     if (busy) return
@@ -146,7 +150,7 @@ private fun ColumnScope.PickList(items: List<Pick>?, error: String, empty: Strin
             error.isNotEmpty() -> { T(error, 15, FontWeight.Bold, pal.red); BigButton("Try again", null, 1, Modifier.fillMaxWidth(), onClick = retry) }
             items == null -> T("Loading…", 15, FontWeight.Medium, pal.ink3)
             items.isEmpty() -> T(empty, 15, FontWeight.Medium, pal.ink3)
-            else -> items.forEach { p -> OptionRow(p.name, if (p.kind.isNotEmpty()) p.kind.replaceFirstChar { it.uppercase() } else null, Icons.Rounded.Place, false, chevron = true) { onPick(p) } }
+            else -> items.forEach { p -> OptionRow(p.name, if (p.kind.isNotEmpty()) p.kind.replaceFirstChar { it.uppercase() } else null, null, false, chevron = true) { onPick(p) } }
         }
         Spacer(Modifier.height(12.dp))
     }
