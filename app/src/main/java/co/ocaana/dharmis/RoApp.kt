@@ -41,14 +41,25 @@ import java.util.Locale
 
 /** The Range Officer app, drawn exactly as the Figma page "v4 · RO command". Always dark; reads the same dashboard data as the other officers. */
 private object V4 {
-    val bg = Color(0xFF09241B); val surf = Color(0xFF0F3125); val surf2 = Color(0xFF16402F); val line = Color(0xFF21503C)
-    val text = Color(0xFFEAF6F0); val mute = Color(0xFF8FB5A4); val acc = Color(0xFF2EE6C5)
-    val high = Color(0xFFFF6B5B); val med = Color(0xFFFFB347); val ok = Color(0xFF4ADE80); val off = Color(0xFF7F968C)
-    val heroRed = Color(0xFF3A1A17); val heroText = Color(0xFFF3CFC9); val heroAmber = Color(0xFF33260F)
+    val bg @Composable get() = if (pal.dark) Color(0xFF09241B) else Color(0xFFF5F1E8)
+    val surf @Composable get() = if (pal.dark) Color(0xFF0F3125) else Color(0xFFFFFFFF)
+    val surf2 @Composable get() = if (pal.dark) Color(0xFF16402F) else Color(0xFFECE6D8)
+    val line @Composable get() = if (pal.dark) Color(0xFF21503C) else Color(0xFFDDD5C3)
+    val text @Composable get() = if (pal.dark) Color(0xFFEAF6F0) else Color(0xFF17261E)
+    val mute @Composable get() = if (pal.dark) Color(0xFF8FB5A4) else Color(0xFF6C7A72)
+    val acc @Composable get() = if (pal.dark) Color(0xFF2EE6C5) else Color(0xFF1D5A43)
+    val onAcc @Composable get() = if (pal.dark) Color(0xFF09241B) else Color.White
+    val high @Composable get() = if (pal.dark) Color(0xFFFF6B5B) else Color(0xFFC4301F)
+    val med @Composable get() = if (pal.dark) Color(0xFFFFB347) else Color(0xFFA86500)
+    val ok @Composable get() = if (pal.dark) Color(0xFF4ADE80) else Color(0xFF1D7A3E)
+    val off @Composable get() = if (pal.dark) Color(0xFF7F968C) else Color(0xFF6C7A72)
+    val heroRed @Composable get() = if (pal.dark) Color(0xFF3A1A17) else Color(0xFFFBE3DD)
+    val heroText @Composable get() = if (pal.dark) Color(0xFFF3CFC9) else Color(0xFF7A2418)
+    val heroAmber @Composable get() = if (pal.dark) Color(0xFF33260F) else Color(0xFFFBECC8)
 }
 
 private sealed class Sc {
-    object Nodes : Sc()
+    class Nodes(val f: String) : Sc()
     object Reports : Sc()
     class Station(val name: String) : Sc()
     class Alert(val node: String) : Sc()
@@ -67,12 +78,13 @@ private class Ro(val d: JSONObject, val push: (Sc) -> Unit, val tab: (String) ->
 
 private fun JSONArray.l(): List<JSONObject> = List(length()) { getJSONObject(it) }
 private fun JSONObject.s(k: String): String = if (isNull(k)) "" else optString(k).let { if (it == "null") "" else it }
+@Composable
 private fun lc(l: String) = when (l) { "high" -> V4.high; "medium" -> V4.med; "low", "safe" -> V4.ok; else -> V4.off }
 private fun lw(l: String) = when (l) { "high" -> "High"; "medium" -> "Medium"; "low" -> "Low"; "safe" -> "Safe"; else -> "No signal" }
 private fun hhmm(sec: Long) = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(sec * 1000))
 private fun nodeSec(n: JSONObject): Long? = if (n.isNull("age")) null else System.currentTimeMillis() / 1000 - n.getLong("age")
 private fun herdText(r: JSONObject) = when (val h = r.getInt("herd")) { 0 -> "no elephants"; 1 -> "1 elephant"; else -> "$h elephants" }
-private fun reportLine(r: JSONObject): String { val n = r.s("note"); return herdText(r) + if (n.isNotBlank()) ", $n" else "" }
+private fun reportLine(r: JSONObject): String = listOf(r.s("seen"), herdText(r), r.s("note")).filter { it.isNotBlank() }.joinToString(", ")
 private val RANKS = listOf("range", "dro", "section", "beat", "watcher", "rrt", "office")
 private fun postWord(p: String) = when (p) {
     "watcher" -> "Forest Watcher"; "rrt" -> "RRT Member"; "beat" -> "Beat Forest Officer"; "section" -> "Section Forest Officer"
@@ -107,7 +119,7 @@ private fun Chip4(label: String, c: Color) {
 private fun CallBtn(phone: String, on: Boolean) {
     val ctx = LocalContext.current
     Box(Modifier.size(36.dp).clip(CircleShape).background(if (on) V4.acc else V4.surf2).clickable { dial(ctx, phone) }, contentAlignment = Alignment.Center) {
-        Icon(Icons.Rounded.Call, "Call", tint = if (on) V4.bg else V4.mute, modifier = Modifier.size(18.dp))
+        Icon(Icons.Rounded.Call, "Call", tint = if (on) V4.onAcc else V4.mute, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -130,7 +142,7 @@ private fun Stat(value: String, label: String, cap: String, m: Modifier, click: 
 private fun FilterRow(items: List<String>, sel: String, onSel: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items.forEach { f -> val on = f == sel
-            Box(Modifier.clip(RoundedCornerShape(20.dp)).background(if (on) V4.acc else V4.surf).clickable { onSel(f) }.padding(horizontal = 14.dp, vertical = 8.dp)) { X(f, 12, FontWeight.SemiBold, if (on) V4.bg else V4.mute) }
+            Box(Modifier.clip(RoundedCornerShape(20.dp)).background(if (on) V4.acc else V4.surf).clickable { onSel(f) }.padding(horizontal = 14.dp, vertical = 8.dp)) { X(f, 12, FontWeight.SemiBold, if (on) V4.onAcc else V4.mute) }
         }
     }
 }
@@ -139,7 +151,7 @@ private fun FilterRow(items: List<String>, sel: String, onSel: (String) -> Unit)
 private fun Segmented(items: List<String>, sel: Int, onSel: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(V4.surf).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         items.forEachIndexed { i, s ->
-            Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(11.dp)).background(if (i == sel) V4.acc else Color.Transparent).clickable { onSel(i) }, contentAlignment = Alignment.Center) { X(s, 13, FontWeight.SemiBold, if (i == sel) V4.bg else V4.mute) }
+            Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(11.dp)).background(if (i == sel) V4.acc else Color.Transparent).clickable { onSel(i) }, contentAlignment = Alignment.Center) { X(s, 13, FontWeight.SemiBold, if (i == sel) V4.onAcc else V4.mute) }
         }
     }
 }
@@ -214,7 +226,7 @@ fun RoApp(dash: DashState) {
                     is Sc.Alert -> AlertScreen(ro, top.node, back)
                     is Sc.Person -> PersonScreen(ro, top.name, back)
                     is Sc.Report -> ReportScreen(ro, top.i, back)
-                    Sc.Nodes -> NodesScreen(ro, back)
+                    is Sc.Nodes -> NodesScreen(ro, top.f, back)
                     Sc.Reports -> ReportsScreen(ro, back)
                 }
             }
@@ -306,10 +318,14 @@ private fun Command(ro: Ro) {
             }
             val onDuty = ro.sum.getInt("on_duty")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat("${ro.sum.getInt("nodes")}", "Nodes", "$live live", Modifier.weight(1f)) { ro.push(Sc.Nodes) }
+                Stat("${ro.sum.getInt("nodes")}", "Nodes", "$live live", Modifier.weight(1f)) { ro.push(Sc.Nodes("All")) }
+                Stat("${ro.sum.getInt("high")}", "High", "alerts", Modifier.weight(1f)) { ro.push(Sc.Nodes("High")) }
+                Stat("${ro.sum.getInt("medium")}", "Medium", "alerts", Modifier.weight(1f)) { ro.push(Sc.Nodes("Medium")) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Stat("${ro.sum.getInt("offline")}", "No signal", "nodes", Modifier.weight(1f)) { ro.push(Sc.Nodes("No signal")) }
                 Stat("${ro.sum.getInt("reports24")}", "Reports", "today", Modifier.weight(1f)) { ro.push(Sc.Reports) }
                 Stat("$onDuty", "On duty", "of ${ro.sum.getInt("people")}", Modifier.weight(1f)) { ro.tab("People") }
-                Stat("${ro.sum.getInt("high") + ro.sum.getInt("medium")}", "Alerts", "${ro.sum.getInt("high")} H · ${ro.sum.getInt("medium")} M", Modifier.weight(1f)) { ro.tab("Stations") }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 X("Your stations", 15, FontWeight.Bold, m = Modifier.weight(1f))
@@ -353,7 +369,7 @@ private fun PersonRow(ro: Ro, p: JSONObject) {
     val duty = p.optBoolean("duty", true); val on = duty && p.getBoolean("on_duty")
     Row(Modifier.fillMaxWidth().clickable { ro.push(Sc.Person(p.getString("name"))) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Av(p.getString("name"), 40, if (on) V4.ok else null); Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) { X(p.getString("name"), 14, FontWeight.SemiBold); X(postWord(p.s("post")), 12, FontWeight.Medium, V4.mute) }
+        Column(Modifier.weight(1f)) { X(p.getString("name"), 14, FontWeight.SemiBold); X(postWord(p.s("post")) + if (duty && !on) " · off duty" else "", 12, FontWeight.Medium, V4.mute) }
         CallBtn(p.getString("phone"), on)
     }
 }
@@ -400,24 +416,25 @@ private fun ReportRow(ro: Ro, r: JSONObject) {
     }
 }
 
-private class Ev(val t: Long, val label: String, val c: Color, val title: String, val sub: String, val office: String, val click: Sc?)
+private class Ev(val t: Long, val label: String, val c: String, val title: String, val sub: String, val office: String, val click: Sc?)
 
 @Composable
 private fun Today(ro: Ro) {
     var f by remember { mutableStateOf("All") }
     val evs = remember(ro.d) {
         val l = mutableListOf<Ev>()
-        ro.reports.forEachIndexed { i, r -> l.add(Ev(r.getLong("at"), "REPORT", V4.acc, "${r.s("by").ifBlank { "A report" }} saw ${herdText(r)}", listOf(r.s("note"), r.s("office")).filter { it.isNotBlank() }.joinToString(" · "), r.s("office"), Sc.Report(i))) }
+        ro.reports.forEachIndexed { i, r -> l.add(Ev(r.getLong("at"), "REPORT", "acc", "${r.s("by").ifBlank { "A report" }} saw ${herdText(r)}", listOf(r.s("note"), r.s("office")).filter { it.isNotBlank() }.joinToString(" · "), r.s("office"), Sc.Report(i))) }
         ro.nodes.forEach { n -> val lv = n.getString("level"); val t = nodeSec(n)
             when (lv) {
-                "high" -> l.add(Ev(t ?: 0, "HIGH ALERT", V4.high, "${n.getString("id")} is High", listOf(n.s("place"), n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
-                "medium" -> l.add(Ev(t ?: 0, "MEDIUM", V4.med, "${n.getString("id")} is Medium", listOf(n.s("place"), n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
-                "offline" -> l.add(Ev(t ?: 0, "NO SIGNAL", V4.off, "${n.getString("id")} not reporting", listOf(if (t != null) "Last seen ${hhmm(t)}" else "No signal yet", n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
+                "high" -> l.add(Ev(t ?: 0, "HIGH ALERT", "high", "${n.getString("id")} is High", listOf(n.s("place"), n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
+                "medium" -> l.add(Ev(t ?: 0, "MEDIUM", "medium", "${n.getString("id")} is Medium", listOf(n.s("place"), n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
+                "offline" -> l.add(Ev(t ?: 0, "NO SIGNAL", "off", "${n.getString("id")} not reporting", listOf(if (t != null) "Last seen ${hhmm(t)}" else "No signal yet", n.s("office")).filter { it.isNotBlank() }.joinToString(" · "), n.s("office"), Sc.Alert(n.getString("id"))))
             }
         }
         l.sortedByDescending { it.t }
     }
     val shown = evs.filter { f == "All" || it.office == f }
+    val accC = V4.acc
     val alerts = evs.count { it.label == "HIGH ALERT" || it.label == "MEDIUM" }
     Column(Modifier.fillMaxSize()) {
         TopBrand()
@@ -428,8 +445,9 @@ private fun Today(ro: Ro) {
             shown.forEach { e ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     X(if (e.t > 0) hhmm(e.t) else "--:--", 12, FontWeight.Bold, V4.mute, Modifier.width(44.dp))
-                    Box(Modifier.padding(top = 4.dp, end = 10.dp).size(10.dp).clip(CircleShape).background(e.c))
-                    Surf(Modifier.weight(1f), r = 14, click = e.click?.let { c -> { ro.push(c) } }) { X(e.label, 10, FontWeight.ExtraBold, e.c); X(e.title, 14, FontWeight.Bold); if (e.sub.isNotBlank()) X(e.sub, 12, FontWeight.Medium, V4.mute) }
+                    val ec = if (e.c == "acc") accC else lc(e.c)
+                    Box(Modifier.padding(top = 4.dp, end = 10.dp).size(10.dp).clip(CircleShape).background(ec))
+                    Surf(Modifier.weight(1f), r = 14, click = e.click?.let { c -> { ro.push(c) } }) { X(e.label, 10, FontWeight.ExtraBold, ec); X(e.title, 14, FontWeight.Bold); if (e.sub.isNotBlank()) X(e.sub, 12, FontWeight.Medium, V4.mute) }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -486,7 +504,7 @@ private fun PersonScreen(ro: Ro, name: String, back: () -> Unit) {
                     Row(Modifier.padding(vertical = 4.dp)) { X(a, 13, FontWeight.Medium, V4.mute, Modifier.weight(1f)); X(b, 14, FontWeight.SemiBold) }
                 }
             }
-            PBtn("Call $name", V4.acc, V4.bg, Modifier.fillMaxWidth(), Icons.Rounded.Call, 58) { dial(ctx, p.getString("phone")) }
+            PBtn("Call $name", V4.acc, V4.onAcc, Modifier.fillMaxWidth(), Icons.Rounded.Call, 58) { dial(ctx, p.getString("phone")) }
             if (office.isNotBlank() && ro.kids.any { it.s("name") == office }) PBtn("Open $office", null, V4.text, Modifier.fillMaxWidth(), null, 52) { ro.push(Sc.Station(office)) }
         }
     }
@@ -541,15 +559,17 @@ private fun PersonRowSub(ro: Ro, p: JSONObject, sub: String) {
 }
 
 @Composable
-private fun NodesScreen(ro: Ro, back: () -> Unit) {
-    var f by remember { mutableStateOf("All") }
+private fun NodesScreen(ro: Ro, start: String, back: () -> Unit) {
+    var f by remember { mutableStateOf(start) }
     fun want(l: String) = when (f) { "High" -> l == "high"; "Medium" -> l == "medium"; "No signal" -> l == "offline"; else -> true }
     val shown = ro.nodes.filter { want(it.getString("level")) }
     val groups = shown.groupBy { it.s("office").ifBlank { "Other" } }
     Column(Modifier.fillMaxSize()) {
         BackTop("Nodes", "Across ${ro.rangeName}", null, back)
         Body {
-            FilterRow(listOf("All", "High", "Medium", "No signal"), f) { f = it }
+            fun cnt(l: String?) = ro.nodes.count { l == null || it.getString("level") == l }
+            val labels = listOf("All" to cnt(null), "High" to cnt("high"), "Medium" to cnt("medium"), "No signal" to cnt("offline")).map { (a, n) -> "$a $n" }
+            FilterRow(labels, labels.first { it.substringBeforeLast(" ") == f }) { f = it.substringBeforeLast(" ") }
             if (shown.isEmpty()) X("Nothing here.", 14, FontWeight.Medium, V4.mute)
             groups.forEach { (office, ns) ->
                 X("$office · ${ns.size} nodes", 13, FontWeight.Bold, V4.mute)
@@ -592,7 +612,7 @@ private fun ReportScreen(ro: Ro, i: Int, back: () -> Unit) {
                 }
             }
             if (r.s("note").isNotBlank()) Surf(Modifier.fillMaxWidth()) { X("NOTE", 11, FontWeight.ExtraBold, V4.mute); X(r.s("note"), 14) }
-            if (who != null) PBtn("Call $by", V4.acc, V4.bg, Modifier.fillMaxWidth(), Icons.Rounded.Call, 58) { dial(ctx, who.getString("phone")) }
+            if (who != null) PBtn("Call $by", V4.acc, V4.onAcc, Modifier.fillMaxWidth(), Icons.Rounded.Call, 58) { dial(ctx, who.getString("phone")) }
         }
     }
 }
@@ -614,6 +634,15 @@ private fun Me(ro: Ro) {
                 Spacer(Modifier.height(8.dp))
                 X("${p.range.division} · ${p.range.circle}", 12, FontWeight.Medium, V4.mute)
             }
+            val mode by Store.themeMode
+            Surf(Modifier.fillMaxWidth()) {
+                X("Appearance", 13, FontWeight.SemiBold, V4.mute)
+                Spacer(Modifier.height(8.dp))
+                Segmented(listOf("Auto", "Light", "Dark"), mode) { Store.setTheme(it) }
+                Spacer(Modifier.height(8.dp))
+                X("Auto turns dark at sunset and light at sunrise for your station.", 12, FontWeight.Medium, V4.mute)
+            }
+            X("Your personal dashboard. No duty status and no alerts here.", 12, FontWeight.Medium, V4.mute)
             if (p != null && p.range.phone.isNotBlank()) Surf(Modifier.fillMaxWidth(), click = { dial(ctx, p.range.phone) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Call, null, tint = V4.acc, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(12.dp)); Column { X("Call your range office", 15, FontWeight.Bold); X("${p.range.name} · ${p.range.phone}", 12, FontWeight.Medium, V4.mute) } }
             }
