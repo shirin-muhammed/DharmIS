@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
         Api.active = true
         Store.resumeTick.value++
         Api.poll()
+        Updater.check()
     }
 
     // Location is only ever on while a report or the Go map is open, and not while the app is in the background.
@@ -109,6 +110,7 @@ fun App() {
         // GPS runs only while a report or the Go map is open.
         val needsLoc = chat != null || go != null
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
+        UpdateDialog(ctx)
         when {
             splash -> Splash { splash = false }
             !registered && mode2 == 1 -> Login(onBack = { mode2 = 0 }) { Api.poll() }

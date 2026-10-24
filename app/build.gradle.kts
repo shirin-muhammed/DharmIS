@@ -13,7 +13,10 @@ android {
         applicationId = "co.ocaana.dharmis"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        // The release workflow passes its run number, so the app knows which build it is.
+        val buildNo = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 1
+        versionCode = buildNo
+        buildConfigField("int", "BUILD_NUMBER", "$buildNo")
         versionName = "0.1.0"
         // Empty until the OCAANA server has the RRT endpoints; reports then stay "Waiting to send" on the phone.
         buildConfigField("String", "API_BASE", "\"https://tagit.co.in/ocaana-control/\"")
