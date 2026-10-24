@@ -32,6 +32,10 @@ object Store {
 
     val profile = mutableStateOf<Profile?>(null)
     val onDuty = mutableStateOf(true)
+    /** Post on the server: rrt, watcher, beat get alerts; office (station or section login), section, dro, range get the dashboard instead. */
+    val rank = mutableStateOf("rrt")
+    val isOfficer get() = rank.value in setOf("office", "section", "dro", "range")
+    fun setRank(r: String) { if (r.isNotBlank() && r != rank.value) { rank.value = r; sp.edit().putString("rank", r).apply() } }
     val themeMode = mutableStateOf(0) // 0 auto, 1 light, 2 dark
     val reports = mutableStateListOf<Report>()
     /** Bumped on every report change so screens re-read corrections and sent flags. */
@@ -62,6 +66,7 @@ object Store {
         photoDir = File(ctx.filesDir, "photos").apply { mkdirs() }
         Directory.load(ctx)
         onDuty.value = sp.getBoolean("duty", true)
+        rank.value = sp.getString("rank", "rrt")!!
         themeMode.value = sp.getInt("theme", 0)
         sp.getString("profile", null)?.let { s ->
             val o = JSONObject(s)
@@ -103,12 +108,12 @@ object Store {
     /** Signs this phone out: alerts stop and the member is forgotten here. Saved reports stay on the phone; they are never deleted. */
     fun logout() {
         Api.signOut()
-        setToken(""); sp.edit().remove("profile").apply()
+        setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"
         profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget()
     }
 
     /** The server no longer knows this phone (for example the PIN was used to log in elsewhere): back to the log in screen. Reports stay. */
-    fun signedOut() { setToken(""); sp.edit().remove("profile").apply(); profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget(); AlertService.sync(app) }
+    fun signedOut() { setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"; profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget(); AlertService.sync(app) }
 
     fun markSent(id: String) { reports.firstOrNull { it.id == id }?.sent = true; persist() }
     fun markCorrectionSynced(id: String, at: Long) { reports.firstOrNull { it.id == id }?.corrections?.firstOrNull { it.at == at }?.synced = true; persist() }

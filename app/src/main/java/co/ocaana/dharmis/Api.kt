@@ -56,8 +56,19 @@ object Api {
             val t = r?.json?.optString("token") ?: ""
             if (r == null || r.code != 200 || m == null || t.isBlank()) { main.post { done(failText(r)) }; return@thread }
             val range = Directory.ranges.firstOrNull { it.name == m.optString("range") && it.division == m.optString("division") } ?: Directory.ranges.firstOrNull { it.name == m.optString("range") }
-            if (range == null) { main.post { done("Your range office is not in this app's list. Call your control room.") }; return@thread }
-            main.post { Store.setToken(t); Store.saveProfile(Profile(m.optString("name"), m.optString("phone"), m.optString("role"), m.optString("station"), range)); done(null) }
+            val rank = m.optString("rank", "rrt")
+            val office = range ?: if (rank in setOf("office", "section", "dro", "range")) RangeOffice(m.optString("range"), "", emptyList(), m.optString("division"), m.optString("circle")) else null   // officers are set up by staff and may not be in the registration list
+            if (office == null) { main.post { done("Your range office is not in this app's list. Call your control room.") }; return@thread }
+            main.post { Store.setRank(rank); Store.setToken(t); Store.saveProfile(Profile(m.optString("name"), m.optString("phone"), m.optString("role"), m.optString("station"), office)); done(null) }
+        }
+    }
+
+    /** Officer dashboard for one office (0 = their own). done gets the JSON, or null and a message. */
+    fun dash(unit: Int, done: (JSONObject?, String?) -> Unit) {
+        thread {
+            val r = call(if (unit > 0) "dash&unit=$unit" else "dash")
+            if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
+            if (r != null && r.code == 200) main.post { done(r.json, null) } else main.post { done(null, failText(r)) }
         }
     }
 
@@ -84,10 +95,11 @@ object Api {
             try {
                 if (Store.token.isBlank()) return@thread
                 val duty = Store.onDuty.value
-                sendPushToken()
+                if (!Store.isOfficer) sendPushToken()
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
-                if (r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
+                if (r != null && r.json.has("rank")) { val rk = r.json.optString("rank"); main.post { Store.setRank(rk) } }
+                if (!Store.isOfficer && r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
                     call("duty", JSONObject().put("on_duty", duty))
                     r = call("alerts")
                 }
@@ -101,7 +113,7 @@ object Api {
                         if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"))
                 }
                 main.post { Store.serverStatus.value = status; Store.online.value = true; Store.lastOk.value = System.currentTimeMillis(); Store.alerts.clear(); Store.alerts.addAll(alerts) }
-                if (Store.onDuty.value) Notify.check(Store.app, alerts)
+                if (Store.onDuty.value && !Store.isOfficer) Notify.check(Store.app, alerts)
                 if (status == "active") send()
             } finally { busy = false }
         }

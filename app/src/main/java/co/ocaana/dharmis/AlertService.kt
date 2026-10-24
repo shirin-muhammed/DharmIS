@@ -103,7 +103,7 @@ class AlertService : Service() {
 
     companion object {
         fun sync(ctx: Context) {
-            val want = Store.profile.value != null && Store.onDuty.value
+            val want = Store.profile.value != null && Store.onDuty.value && !Store.isOfficer
             val i = Intent(ctx, AlertService::class.java)
             if (want) ContextCompat.startForegroundService(ctx, i) else ctx.stopService(i)
         }

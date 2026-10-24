@@ -41,18 +41,22 @@ fun stamp(t: Long): String = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDe
 fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<String?>(null) }
+    val officer = Store.rank.value in setOf("office", "section", "dro", "range")
     BackHandler(enabled = open != null) { open = null }
     if (open != null) { ReportDetail(open!!) { open = null }; return }
     Page {
         Box(Modifier.weight(1f)) {
-            when (tab) {
-                0 -> Alerts(onReport, onGo)
-                1 -> Reports { open = it }
+            when {
+                officer && tab == 0 -> Dashboard()
+                officer -> Me()
+                tab == 0 -> Alerts(onReport, onGo)
+                tab == 1 -> Reports { open = it }
                 else -> Me()
             }
         }
         Row(Modifier.fillMaxWidth().background(pal.card).padding(vertical = 6.dp)) {
-            listOf(Triple("Alerts", Icons.Rounded.NotificationsActive, 0), Triple("Reports", Icons.Rounded.Description, 1), Triple("Me", Icons.Rounded.Person, 2)).forEach { (l, ic, i) ->
+            (if (officer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Me", Icons.Rounded.Person, 1))
+            else listOf(Triple("Alerts", Icons.Rounded.NotificationsActive, 0), Triple("Reports", Icons.Rounded.Description, 1), Triple("Me", Icons.Rounded.Person, 2))).forEach { (l, ic, i) ->
                 NavItem(l, ic, tab == i, Modifier.weight(1f)) { tab = i }
             }
         }
@@ -262,7 +266,7 @@ private fun Me() {
         if (p.range.phone.isNotBlank()) BigButton("Call the range office", Icons.Rounded.Call, 1, Modifier.fillMaxWidth()) {
             ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + p.range.phone)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
-        DutyRow()
+        if (Store.rank.value !in setOf("office", "section", "dro", "range")) DutyRow()
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
         Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
         T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)
