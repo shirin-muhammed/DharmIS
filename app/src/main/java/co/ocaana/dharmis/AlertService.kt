@@ -16,7 +16,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
-/** Sirens once per alert. An alert sounds again only if its level goes up or it clears and comes back. */
+/** Sirens once per alert. An alert sounds again only if its level goes up or it drops to Safe or Low and comes back. */
 object Notify {
     private const val SIREN = "alert_siren_v1"
     private const val MEDIUM = "alert_medium_v1"
@@ -46,8 +46,9 @@ object Notify {
     fun check(ctx: Context, alerts: List<Alert>) {
         sounded.keys.retainAll(alerts.map { it.node }.toSet())
         for (a in alerts) {
-            val r = rank[a.level] ?: continue
-            if (r < 2 || (sounded[a.node] ?: 0) >= r) continue
+            val r = rank[a.level] ?: 0
+            if (r < 2) { sounded.remove(a.node); continue }   // back to Safe or Low counts as cleared, so the next rise rings again
+            if ((sounded[a.node] ?: 0) >= r) continue
             sounded[a.node] = r
             ring(ctx, a)
         }
