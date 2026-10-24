@@ -49,9 +49,9 @@ val Heavy = FontWeight.ExtraBold
 val Semi = FontWeight.SemiBold
 
 @Composable
-fun Page(content: @Composable ColumnScope.() -> Unit) {
+fun Page(header: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        AppHeader()
+        if (header) AppHeader()
         content()
     }
 }

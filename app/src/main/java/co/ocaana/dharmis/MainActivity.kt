@@ -114,7 +114,7 @@ fun App() {
         when {
             splash -> Splash { splash = false }
             !registered && mode2 == 1 -> Login(onBack = { mode2 = 0 }) { Api.poll() }
-            !registered && mode2 == 2 -> Register(onLogin = { mode2 = 1 }) { Api.poll() }
+            !registered && mode2 == 2 -> Register(onBack = { mode2 = 0 }) { Api.poll() }
             !registered -> Welcome(onLogin = { mode2 = 1 }, onRegister = { mode2 = 2 })
             sentId != null -> Sent(sentId!!) { sentId = null }
             go != null && chat == null -> GoScreen(go!!, onBack = { go = null }, onTurnOnLocation = { askLocation(true) }, onReport = { draft.reset(); startStep = 0; chat = go; go = null })

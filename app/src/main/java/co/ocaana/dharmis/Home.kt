@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,9 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     val dash = rememberDash(officer)
     BackHandler(enabled = open != null) { open = null }
     if (open != null) { ReportDetail(open!!) { open = null }; return }
-    Page {
+    if (Store.serverStatus.value == "pending") { WaitingScreen(); return }
+    Page(header = false) {
+        HomeBar(officer)
         Box(Modifier.weight(1f)) {
             when {
                 limited -> Me()
@@ -129,19 +132,6 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     val duty by Store.onDuty
     val p = Store.profile.value
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { T("Alerts", 26, FontWeight.ExtraBold); T(p?.station ?: "", 13, FontWeight.Medium, pal.ink3) }
-            // Tap to go on or off duty.
-            val on = duty
-            Row(
-                Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).background(if (on) pal.grn2 else pal.card2).clickable { Store.setDuty(!on) }.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(if (on) pal.grn else pal.ink3))
-                Spacer(Modifier.width(8.dp))
-                T(if (on) "On duty" else "Off duty", 15, FontWeight.ExtraBold, if (on) pal.grn else pal.ink3)
-            }
-        }
         if (!duty) {
             Card(Modifier.fillMaxWidth(), pad = 24.dp) {
                 Icon(Icons.Rounded.NotificationsOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
@@ -283,21 +273,77 @@ private fun Me() {
             T("The alert screen is for the RRT unit and for station and section office phones. Your control room can add you to the RRT unit.", 14, FontWeight.Medium, pal.ink2)
         }
         if (Store.alertUser && Store.receives.value) DutyRow()
-        T("Appearance", 14, FontWeight.Bold, pal.ink2)
-        Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
-        T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)
+        Card(Modifier.fillMaxWidth(), pad = 16.dp) {
+            T("Appearance", 13, FontWeight.Bold, pal.ink3)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.card2).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("Auto", "Light", "Dark").forEachIndexed { i, l ->
+                    Box(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(12.dp)).background(if (mode == i) pal.pri else Color.Transparent).clickable { Store.setTheme(i) }, contentAlignment = Alignment.Center) { T(l, 14, FontWeight.Bold, if (mode == i) pal.onPri else pal.ink2) }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            T("Auto turns dark at sunset and light at sunrise.", 12, FontWeight.Medium, pal.ink2)
+        }
         var confirm by remember { mutableStateOf(false) }
-        BigButton("Log out", Icons.Rounded.Logout, 1, Modifier.fillMaxWidth()) { confirm = true }
+        Spacer(Modifier.height(8.dp))
+        BigButton("Sign out", Icons.Rounded.Logout, 1, Modifier.fillMaxWidth()) { confirm = true }
         if (confirm) {
             val unsent = Store.reports.count { !it.sent }
             AlertDialog(
                 onDismissRequest = { confirm = false },
-                title = { Text("Log out of DharmIS?") },
+                title = { Text("Sign out of DharmIS?") },
                 text = { Text("You will get no alerts on this phone until you log in again with your mobile number and PIN." + if (unsent > 0) " $unsent report${if (unsent > 1) "s" else ""} not yet sent stay on this phone and send after you log back in." else " Your saved reports stay on this phone.") },
-                confirmButton = { TextButton(onClick = { confirm = false; Store.logout(); AlertService.sync(ctx.applicationContext) }) { Text("Log out") } },
+                confirmButton = { TextButton(onClick = { confirm = false; Store.logout(); AlertService.sync(ctx.applicationContext) }) { Text("Sign out") } },
                 dismissButton = { TextButton(onClick = { confirm = false }) { Text("Stay logged in") } },
             )
         }
         T("DharmIS 0.1 · OCAANA", 12, FontWeight.Medium, pal.ink3)
+    }
+}
+
+
+/** Figma app bar: logo avatar, name and place, and the tap-to-toggle duty pill for anyone who gets alerts. */
+@Composable
+private fun HomeBar(officer: Boolean) {
+    val ctx = LocalContext.current
+    val logo = remember { android.graphics.BitmapFactory.decodeStream(ctx.assets.open("logo.png"), null, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 })!!.asImageBitmap() }
+    val p = Store.profile.value
+    val duty by Store.onDuty
+    val title = if (officer) p?.name ?: "" else p?.let { it.station.ifBlank { it.range.name } } ?: ""
+    val sub = if (officer) listOf(p?.role ?: "", (p?.station ?: "").ifBlank { p?.range?.name ?: "" }).filter { it.isNotBlank() }.joinToString(" · ") else p?.range?.name ?: ""
+    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF11201A)), contentAlignment = Alignment.Center) {
+            androidx.compose.foundation.Image(logo, "OCAANA", Modifier.size(32.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) { T(title, 18, FontWeight.ExtraBold); T(sub, 12, FontWeight.Medium, pal.ink3) }
+        if (Store.alertUser && Store.receives.value) Row(
+            Modifier.clip(RoundedCornerShape(18.dp)).background(if (duty) pal.grn2 else pal.card2).clickable { Store.setDuty(!duty) }.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (duty) pal.grn else pal.ink3))
+            Spacer(Modifier.width(6.dp))
+            T(if (duty) "On duty" else "Off duty", 13, FontWeight.Bold, if (duty) pal.grn else pal.ink3)
+        }
+    }
+}
+
+/** Shown until the control room approves this phone. */
+@Composable
+private fun WaitingScreen() {
+    val ctx = LocalContext.current
+    val p = Store.profile.value
+    Page(header = false) {
+        Column(Modifier.weight(1f).padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
+            Box(Modifier.size(100.dp).clip(androidx.compose.foundation.shape.CircleShape).background(pal.card2), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Schedule, null, tint = pal.ink2, modifier = Modifier.size(48.dp)) }
+            T("Waiting for approval", 26, FontWeight.ExtraBold, align = androidx.compose.ui.text.style.TextAlign.Center)
+            T("Waiting for your control room to approve you. Alerts start once you are approved.", 15, FontWeight.Medium, pal.ink2, align = androidx.compose.ui.text.style.TextAlign.Center, lh = 22)
+            if (p != null) Card(Modifier.fillMaxWidth(), bg = pal.pri2, border = null, pad = 14.dp) {
+                T("Registered as", 12, FontWeight.Bold, pal.pri)
+                T("${p.name} · ${p.role}", 15, FontWeight.Bold)
+                T(listOf(p.station, if (Store.inRrt.value) "RRT unit" else "").filter { it.isNotBlank() }.joinToString(" · "), 13, FontWeight.Medium, pal.ink2)
+            }
+        }
+        Column(Modifier.padding(20.dp)) { BigButton("Sign out", null, 1, Modifier.fillMaxWidth()) { Store.logout(); AlertService.sync(ctx.applicationContext) } }
     }
 }
