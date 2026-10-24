@@ -18,8 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-val ROLES = listOf("RRT Member", "Forest Watcher", "Beat Forest Officer", "Section Forest Officer", "Deputy Range Officer", "Range Officer", "Office Phone")
-private val POST_KEY = mapOf(ROLES[0] to "rrt", ROLES[1] to "watcher", ROLES[2] to "beat", ROLES[3] to "section", ROLES[4] to "dro", ROLES[5] to "range", ROLES[6] to "office")
+val ROLES = listOf("Range Officer", "Deputy Range Officer", "Section Forest Officer", "Beat Forest Officer", "Forest Watcher", "Office Phone")
+private val POST_KEY = mapOf(ROLES[0] to "range", ROLES[1] to "dro", ROLES[2] to "section", ROLES[3] to "beat", ROLES[4] to "watcher", ROLES[5] to "office")
 
 /** What the person chose from the control room's lists (division, range, office, RRT unit). Staff still approve it under Users. */
 class Place(val post: String, val divisionId: Int, val rangeId: Int, val unitId: Int, val rrtUnitId: Int)
@@ -49,7 +49,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
         add("post"); add("division")
         if (post != "rrt") add("range")
         if (post in setOf("watcher", "beat", "section", "dro", "office")) add("office")
-        if (post == "rrt" || post == "watcher" || post == "beat") add("rrt")
+        if (post in setOf("dro", "section", "beat", "watcher")) add("rrt")
         add("you"); add("pin")
     }
     val key = steps[step.coerceAtMost(steps.size - 1)]
@@ -91,21 +91,17 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 range = division!!.ranges.first { it.id == p.id }; next()
             }
             "office" -> PickList(range!!.offices.filter { o -> when (post) { "section" -> o.kind == "section"; "dro" -> o.kind == "station"; else -> true } }, "", "Nothing is set up here yet. Ask your control room.", {}) { p -> office = p; next() }
-            "rrt" -> Column(Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (post != "rrt") {
-                    T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
-                    T("Only the RRT unit gets elephant alerts. If you work for a station or section, answer No.", 14, FontWeight.Medium, pal.ink2)
-                    OptionRow("Yes", null, null, inRrt == true) { inRrt = true }
-                    OptionRow("No", null, null, inRrt == false) { inRrt = false; rrtUnit = null }
-                }
-                if (post == "rrt" || inRrt == true) {
-                    val units = division!!.rrt
-                    if (units.isEmpty()) T("No RRT unit has been set up for this division yet. Ask your control room.", 14, FontWeight.Medium, pal.ink3)
-                    units.forEach { u -> OptionRow(u.name, null, null, rrtUnit?.id == u.id) { rrtUnit = u } }
-                }
+            "rrt" -> Column(Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
+                T("The RRT unit gets elephant alerts and the alert screens.", 14, FontWeight.Medium, pal.ink2)
+                val units = division!!.rrt
+                // one RRT unit per division is the usual case: Yes joins it without asking
+                OptionRow("Yes", null, null, inRrt == true) { inRrt = true; rrtUnit = units.singleOrNull() }
+                OptionRow("No", null, null, inRrt == false) { inRrt = false; rrtUnit = null }
+                if (inRrt == true && units.isEmpty()) T("No RRT unit has been set up for this division yet. Ask your control room.", 14, FontWeight.Medium, pal.ink3)
+                if (inRrt == true && units.size > 1) { T("Which RRT unit?", 14, FontWeight.Bold, pal.ink2); units.forEach { u -> OptionRow(u.name, null, null, rrtUnit?.id == u.id) { rrtUnit = u } } }
                 Spacer(Modifier.weight(1f))
-                val ok = if (post == "rrt" || inRrt == true) rrtUnit != null else inRrt == false
-                BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = ok) { next() }
+                BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = inRrt == false || (inRrt == true && rrtUnit != null)) { next() }
                 Spacer(Modifier.height(20.dp))
             }
             else -> {
@@ -115,7 +111,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 val shown = if (again) pin else first
                 fun finish(p: String) {
                     busy = true; error = ""
-                    Api.signUp(Profile(if (post == "office") office!!.name else name.trim(), phone, role, office?.name ?: rrtUnit?.name ?: "", RangeOffice(range?.name ?: "", "", emptyList(), division!!.name, "")), p, Place(post, division!!.id, range?.id ?: 0, office?.id ?: 0, if (post == "rrt" || inRrt == true) rrtUnit?.id ?: 0 else 0)) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
+                    Api.signUp(Profile(if (post == "office") office!!.name else name.trim(), phone, role, office?.name ?: rrtUnit?.name ?: "", RangeOffice(range?.name ?: "", "", emptyList(), division!!.name, "")), p, Place(post, division!!.id, range?.id ?: 0, office?.id ?: 0, if (inRrt == true) rrtUnit?.id ?: 0 else 0)) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
                 }
                 fun press(d: Char) {
                     if (busy) return

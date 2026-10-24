@@ -110,12 +110,13 @@ object Api {
             try {
                 if (Store.token.isBlank()) return@thread
                 val duty = Store.onDuty.value
-                if (!Store.isOfficer) sendPushToken()
+                if (Store.alertUser) sendPushToken()
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
                 if (r != null && r.json.has("receives")) { val rv = r.json.optBoolean("receives", true); main.post { Store.receives.value = rv } }
+                if (r != null && r.json.has("in_rrt")) { val iv = r.json.optBoolean("in_rrt"); main.post { Store.inRrt.value = iv } }
                 if (r != null && r.json.has("rank")) { val rk = r.json.optString("rank"); main.post { Store.setRank(rk) } }
-                if (!Store.isOfficer && r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
+                if (Store.alertUser && r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
                     call("duty", JSONObject().put("on_duty", duty))
                     r = call("alerts")
                 }
@@ -129,7 +130,7 @@ object Api {
                         if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"))
                 }
                 main.post { Store.serverStatus.value = status; Store.online.value = true; Store.lastOk.value = System.currentTimeMillis(); Store.alerts.clear(); Store.alerts.addAll(alerts) }
-                if (Store.onDuty.value && !Store.isOfficer) Notify.check(Store.app, alerts)
+                if (Store.onDuty.value && Store.alertUser) Notify.check(Store.app, alerts)
                 if (status == "active") send()
             } finally { busy = false }
         }

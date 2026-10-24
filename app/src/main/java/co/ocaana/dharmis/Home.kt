@@ -42,6 +42,7 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<String?>(null) }
     val officer = Store.rank.value in setOf("section", "dro", "range")
+    val rrtOfficer = officer && Store.inRrt.value
     val limited = !officer && !Store.receives.value   // a watcher or beat officer posted at a station or section: not in the RRT unit
     BackHandler(enabled = open != null) { open = null }
     if (open != null) { ReportDetail(open!!) { open = null }; return }
@@ -50,6 +51,8 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
             when {
                 limited -> Me()
                 officer && tab == 0 -> Dashboard()
+                rrtOfficer && tab == 1 -> Alerts(onReport, onGo)
+                rrtOfficer && tab == 2 -> Reports { open = it }
                 officer -> Me()
                 tab == 0 -> Alerts(onReport, onGo)
                 tab == 1 -> Reports { open = it }
@@ -57,7 +60,8 @@ fun Home(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
             }
         }
         if (!limited) Row(Modifier.fillMaxWidth().background(pal.card).padding(vertical = 6.dp)) {
-            (if (officer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Me", Icons.Rounded.Person, 1))
+            (if (rrtOfficer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Alerts", Icons.Rounded.NotificationsActive, 1), Triple("Reports", Icons.Rounded.Description, 2), Triple("Me", Icons.Rounded.Person, 3))
+            else if (officer) listOf(Triple("Dashboard", Icons.Rounded.Dashboard, 0), Triple("Me", Icons.Rounded.Person, 1))
             else listOf(Triple("Alerts", Icons.Rounded.NotificationsActive, 0), Triple("Reports", Icons.Rounded.Description, 1), Triple("Me", Icons.Rounded.Person, 2))).forEach { (l, ic, i) ->
                 NavItem(l, ic, tab == i, Modifier.weight(1f)) { tab = i }
             }
@@ -272,7 +276,7 @@ private fun Me() {
             T("Alerts are not for your post", 17, FontWeight.ExtraBold)
             T("The alert screen is for the RRT unit and for station and section office phones. Your control room can add you to the RRT unit.", 14, FontWeight.Medium, pal.ink2)
         }
-        if (Store.rank.value !in setOf("section", "dro", "range") && Store.receives.value) DutyRow()
+        if (Store.alertUser && Store.receives.value) DutyRow()
         T("Appearance", 14, FontWeight.Bold, pal.ink2)
         Chips(listOf("Auto", "Light", "Dark"), setOf(listOf("Auto", "Light", "Dark")[mode])) { Store.setTheme(listOf("Auto", "Light", "Dark").indexOf(it)) }
         T("Auto turns dark at sunset.", 12, FontWeight.Medium, pal.ink3)

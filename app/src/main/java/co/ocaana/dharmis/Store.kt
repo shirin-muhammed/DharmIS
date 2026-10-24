@@ -37,6 +37,8 @@ object Store {
     /** False for a watcher or beat officer posted at a station or section: alerts go to the RRT team and office phones only. */
     val receives = mutableStateOf(true)
     val isOfficer get() = rank.value in setOf("section", "dro", "range")
+    val inRrt = mutableStateOf(false)   // an officer who is also in the RRT unit gets the alert screens too
+    val alertUser get() = !isOfficer || inRrt.value
     fun setRank(r: String) { if (r.isNotBlank() && r != rank.value) { rank.value = r; sp.edit().putString("rank", r).apply() } }
     val themeMode = mutableStateOf(0) // 0 auto, 1 light, 2 dark
     val reports = mutableStateListOf<Report>()
@@ -110,12 +112,12 @@ object Store {
     /** Signs this phone out: alerts stop and the member is forgotten here. Saved reports stay on the phone; they are never deleted. */
     fun logout() {
         Api.signOut()
-        setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"
+        setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"; inRrt.value = false
         profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget()
     }
 
     /** The server no longer knows this phone (for example the PIN was used to log in elsewhere): back to the log in screen. Reports stay. */
-    fun signedOut() { setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"; profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget(); AlertService.sync(app) }
+    fun signedOut() { setToken(""); sp.edit().remove("profile").remove("rank").apply(); rank.value = "rrt"; inRrt.value = false; profile.value = null; serverStatus.value = ""; alerts.clear(); Notify.forget(); AlertService.sync(app) }
 
     fun markSent(id: String) { reports.firstOrNull { it.id == id }?.sent = true; persist() }
     fun markCorrectionSynced(id: String, at: Long) { reports.firstOrNull { it.id == id }?.corrections?.firstOrNull { it.at == at }?.synced = true; persist() }

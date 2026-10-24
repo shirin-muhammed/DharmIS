@@ -82,7 +82,7 @@ fun Dashboard() {
         val reports = d.getJSONArray("reports").items()
         val people = d.getJSONArray("people").items()
         // A station or section shows only its live nodes and, below them, its team. Higher offices show cards that open lists.
-        val office = u.getString("kind") in setOf("station", "section")
+        val office = stack.isNotEmpty() && u.getString("kind") in setOf("station", "section")
         if (!office) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Tile("${s.getInt("nodes")}", "Nodes", null, Modifier.weight(1f)) { detail = "nodes" }
