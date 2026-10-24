@@ -18,7 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-val ROLES = listOf("Forest Watcher", "Beat Forest Officer", "Section Forest Officer", "Range Officer", "RRT member")
+val ROLES = listOf("RRT member", "Forest Watcher", "Beat Forest Officer", "Section Forest Officer (SFO)", "Deputy Range Officer (station in charge)", "Range Officer (RO)", "Office phone (station or section)")
+private val POST_KEY = mapOf(ROLES[0] to "rrt", ROLES[1] to "watcher", ROLES[2] to "beat", ROLES[3] to "section", ROLES[4] to "dro", ROLES[5] to "range", ROLES[6] to "office")
+
+/** Where the person works, sent with the registration. Staff approve it under Users before it gives any access. */
+class Place(val post: String, val rrtUnit: Boolean, val section: String, val officeKind: String)
 
 @Composable
 fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
@@ -29,20 +33,26 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
     var typedStation by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("RRT member") }
+    var role by remember { mutableStateOf("") }
+    var inRrt by remember { mutableStateOf<Boolean?>(null) }
+    var sectionName by remember { mutableStateOf("") }
+    var officeKind by remember { mutableStateOf("Forest station") }
+    val post = POST_KEY[role] ?: ""
+    val needsPlace = post in setOf("watcher", "beat", "section", "office")
     var pin by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    BackHandler(enabled = step > 0) { step-- }
+    fun back() { step = if (step == 4 && !needsPlace) 2 else step - 1 }
+    BackHandler(enabled = step > 0) { back() }
 
     Page {
         BackBar(
-            when (step) { 0 -> "Your range office"; 1 -> "Your station"; 2 -> "About you"; else -> "Choose your PIN" },
-            "Step ${step + 1} of 4",
-            onBack = { if (step > 0) step-- },
+            when (step) { 0 -> "Your range office"; 1 -> "Your station"; 2 -> "About you"; 3 -> "Your office"; else -> "Choose your PIN" },
+            "Step ${step + 1} of 5",
+            onBack = { if (step > 0) back() },
         )
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            for (i in 0..3) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
+            for (i in 0..4) Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) pal.pri else pal.line))
         }
         Spacer(Modifier.height(14.dp))
         when (step) {
@@ -82,11 +92,31 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                     }
                     Field("Your name", name, "Full name") { name = it }
                     Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) }
-                    T("Your role", 14, FontWeight.Bold, pal.ink2)
+                    T("Your post", 14, FontWeight.Bold, pal.ink2)
                     Chips(ROLES, setOf(role)) { role = it }
                 }
                 Column(Modifier.padding(20.dp)) {
-                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10) { step = 3 }
+                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = name.isNotBlank() && phone.length == 10 && post.isNotEmpty()) { step = if (needsPlace) 3 else 4 }
+                }
+            }
+            3 -> {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    if (post == "watcher" || post == "beat") {
+                        T("Are you part of the RRT unit?", 18, FontWeight.ExtraBold)
+                        T("Only the RRT unit gets elephant alerts. If you work for a station or section, answer No.", 14, FontWeight.Medium, pal.ink2)
+                        Chips(listOf("Yes", "No"), setOf(if (inRrt == true) "Yes" else if (inRrt == false) "No" else "")) { inRrt = it == "Yes" }
+                    }
+                    if (post == "office") {
+                        T("This phone belongs to a", 18, FontWeight.ExtraBold)
+                        Chips(listOf("Forest station", "Section office"), setOf(officeKind)) { officeKind = it }
+                    }
+                    if (post == "section" || (post == "office" && officeKind == "Section office")) {
+                        Field("Name of your section office", sectionName, "e.g. Kuttampuzha section") { sectionName = it }
+                    }
+                }
+                Column(Modifier.padding(20.dp)) {
+                    val ok = when (post) { "watcher", "beat" -> inRrt != null; "section" -> sectionName.isNotBlank(); else -> officeKind == "Forest station" || sectionName.isNotBlank() }
+                    BigButton("Continue", Icons.Rounded.Check, modifier = Modifier.fillMaxWidth(), enabled = ok) { step = 4 }
                 }
             }
             else -> {
@@ -96,7 +126,7 @@ fun Register(onLogin: () -> Unit, onDone: () -> Unit) {
                 val shown = if (again) pin else first
                 fun finish(p: String) {
                     busy = true; error = ""
-                    Api.signUp(Profile(name.trim(), phone, role, (station ?: typedStation).trim(), range!!), p) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
+                    Api.signUp(Profile(name.trim(), phone, role, (station ?: typedStation).trim(), range!!), p, Place(post, inRrt == true, sectionName.trim(), if (officeKind == "Section office") "section" else "station")) { e -> busy = false; if (e == null) onDone() else { error = e; again = false; first = ""; pin = "" } }
                 }
                 fun press(d: Char) {
                     if (busy) return

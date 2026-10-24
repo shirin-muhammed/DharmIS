@@ -38,10 +38,11 @@ object Api {
     private fun failText(r: Reply?) = if (r == null) "No signal. Try again." else r.json.optString("error").ifBlank { "Something went wrong. Try again." }
 
     /** Registers a new member. done gets null on success (token saved) or a message to show. */
-    fun signUp(p: Profile, pin: String, done: (String?) -> Unit) {
+    fun signUp(p: Profile, pin: String, place: Place, done: (String?) -> Unit) {
         thread {
             val r = call("register", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station)
-                .put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle).put("pin", pin), "")
+                .put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle).put("pin", pin)
+                .put("post", place.post).put("rrt_unit", place.rrtUnit).put("section", place.section).put("office_kind", place.officeKind), "")
             val t = r?.json?.optString("token") ?: ""
             if (r != null && r.code == 200 && t.isNotBlank()) { main.post { Store.setToken(t); Store.saveProfile(p); done(null) } }
             else main.post { done(failText(r)) }
