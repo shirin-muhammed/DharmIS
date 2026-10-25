@@ -79,11 +79,19 @@ object Api {
     }
 
     /** Officer dashboard for one office (0 = their own). done gets the JSON, or null and a message. */
-    fun dash(unit: Int, done: (JSONObject?, String?) -> Unit) {
+    fun dash(unit: Int, have: String = "", done: (JSONObject?, String?) -> Unit) {
         thread {
-            val r = call(if (unit > 0) "dash&unit=$unit" else "dash")
+            val r = call((if (unit > 0) "dash&unit=$unit" else "dash") + if (have.isNotBlank()) "&h=$have" else "")
             if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
             if (r != null && r.code == 200) main.post { done(r.json, null) } else main.post { done(null, failText(r)) }
+        }
+    }
+
+    /** Signal strip of one node for the last hour (RO alert detail). Null when the server is older or the node is out of reach. */
+    fun node(id: String, done: (JSONObject?) -> Unit) {
+        thread {
+            val r = call("node&id=" + java.net.URLEncoder.encode(id, "UTF-8"))
+            main.post { done(if (r != null && r.code == 200) r.json else null) }
         }
     }
 

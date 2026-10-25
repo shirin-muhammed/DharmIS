@@ -75,7 +75,7 @@ fun rememberDash(enabled: Boolean): DashState {
     LaunchedEffect(enabled, s.stack.lastOrNull(), Store.resumeTick.value) {
         if (!enabled) return@LaunchedEffect
         while (true) {
-            Api.dash(s.stack.lastOrNull() ?: 0) { d, e -> if (d != null) { s.data = d; s.err = null } else s.err = e }
+            Api.dash(s.stack.lastOrNull() ?: 0, s.data?.optString("hash") ?: "") { d, e -> if (d != null) { if (!d.optBoolean("same")) s.data = d; s.err = null } else s.err = e }
             delay(30_000)
         }
     }
