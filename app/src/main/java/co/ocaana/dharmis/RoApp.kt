@@ -484,11 +484,12 @@ private fun Today(ro: Ro) {
 private fun People(ro: Ro) {
     var seg by remember { mutableIntStateOf(0) }
     var team by remember { mutableIntStateOf(0) }   // 0 stations, 1 the RRT units
-    val all = ro.people.filter { it.optBoolean("rrt") == (team == 1) }
+    // an officer in the RRT unit is a normal officer at their station and also a unit of the division, so they appear in both lists
+    val all = ro.people.filter { if (team == 1) it.optBoolean("rrt") else it.s("okind") != "rrt" && it.s("office").isNotBlank() }
     val duty = all.filter { it.optBoolean("duty", true) }
     val on = duty.count { it.getBoolean("on_duty") }
     val list = all.filter { p -> val d = p.optBoolean("duty", true); when (seg) { 0 -> d && p.getBoolean("on_duty"); 1 -> d && !p.getBoolean("on_duty"); else -> true } }
-    val groups = list.groupBy { it.s("office").ifBlank { ro.rangeName } }
+    val groups = list.groupBy { p -> if (team == 1) p.s("rrt_unit").ifBlank { p.s("office").ifBlank { ro.rangeName } } else p.s("office") }
     Column(Modifier.fillMaxSize()) {
         TopBrand()
         Body {
