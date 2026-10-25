@@ -169,8 +169,9 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                 alerts.isEmpty() -> Card(Modifier.fillMaxWidth(), pad = 24.dp) {
                     Icon(if (online) Icons.Rounded.CheckCircle else Icons.Rounded.CloudOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
                     Spacer(Modifier.height(10.dp))
-                    T(if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
-                    T(if (online) "All your nodes are quiet. You are alerted when a node reaches High." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
+                    val noNodes = online && Store.rank.value == "office"
+                    T(if (noNodes) "No nodes assigned to your office yet" else if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
+                    T(if (noNodes) "Ask your control room." else if (online) "All your nodes are quiet. You are alerted when a node reaches High." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
                     val ok = Store.lastOk.value
                     if (ok > 0) T("Last checked " + SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date(ok)), 12, FontWeight.Bold, pal.ink3)
                 }
@@ -194,7 +195,7 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        Respond(a, lc)
+                        if (a.level.equals("High", true)) Respond(a, lc)
                     }
                 }
             }
@@ -302,6 +303,7 @@ private fun Me() {
             T("Me", 26, FontWeight.ExtraBold)
             Card(Modifier.fillMaxWidth(), pad = 16.dp) {
                 T(p.name, 18, FontWeight.ExtraBold)
+                T(listOf(p.role, if (Store.inRrt.value) "RRT unit" else "").filter { it.isNotBlank() }.joinToString(" · "), 14, FontWeight.Bold, pal.pri)
                 T("+91 ${p.phone}", 14, FontWeight.Medium)
                 T("${p.station} · ${p.range.name}", 13, FontWeight.Medium, pal.ink3)
                 T("${p.range.division} · ${p.range.circle}", 13, FontWeight.Medium, pal.ink3)

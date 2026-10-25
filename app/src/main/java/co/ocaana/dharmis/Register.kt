@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-val ROLES = listOf("Range Officer", "Deputy Range Officer", "Section Forest Officer", "Beat Forest Officer", "Forest Watcher", "Office Phone")
+val ROLES = listOf("Range Officer", "Deputy Range Forest Officer", "Section Forest Officer", "Beat Forest Officer", "Forest Watcher", "Office Phone")
 private val POST_KEY = mapOf(ROLES[0] to "range", ROLES[1] to "dro", ROLES[2] to "section", ROLES[3] to "beat", ROLES[4] to "watcher", ROLES[5] to "office")
 
 /** What the person chose from the control room's lists (division, range, office, RRT unit). Staff still approve it under Users. */

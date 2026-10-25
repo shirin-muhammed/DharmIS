@@ -92,7 +92,7 @@ private fun stepWord(s: String) = when (s) { "accepted" -> "Accepted"; "on_the_w
 private fun openMap(ctx: Context, lat: Double, lon: Double, label: String) { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon(${Uri.encode(label)})")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 private fun postWord(p: String) = when (p) {
     "watcher" -> "Forest Watcher"; "rrt" -> "RRT Member"; "beat" -> "Beat Forest Officer"; "section" -> "Section Forest Officer"
-    "dro" -> "Deputy Range Officer"; "range" -> "Range Officer"; "office" -> "Office Phone"; else -> p
+    "dro" -> "Deputy Range Forest Officer"; "range" -> "Range Officer"; "office" -> "Office Phone"; else -> p
 }
 private fun dial(ctx: Context, phone: String) { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 

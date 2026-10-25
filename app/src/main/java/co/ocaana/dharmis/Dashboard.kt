@@ -33,7 +33,7 @@ private fun JSONArray?.items(): List<JSONObject> = if (this == null) emptyList()
 
 private fun postName(p: String) = when (p) {
     "watcher" -> "Forest Watcher"; "rrt" -> "RRT Member"; "beat" -> "Beat Forest Officer"; "section" -> "Section Forest Officer"
-    "dro" -> "Deputy Range Officer"; "range" -> "Range Officer"; "office" -> "Office Phone"; else -> p
+    "dro" -> "Deputy Range Forest Officer"; "range" -> "Range Officer"; "office" -> "Office Phone"; else -> p
 }
 
 private fun kindName(k: String) = when (k) { "division" -> "Division"; "range" -> "Range"; "section" -> "Section office"; "station" -> "Forest station"; "rrt" -> "RRT unit"; else -> k }
@@ -93,7 +93,7 @@ private fun TabPage(s: DashState, content: @Composable ColumnScope.(JSONObject) 
     }
 }
 
-/** Cards for the office; a Deputy Range Officer or SFO also sees live nodes and the team below. Drilled into a station or section it shows only the live nodes and the team. */
+/** Cards for the office; a Deputy Range Forest Officer or SFO also sees live nodes and the team below. Drilled into a station or section it shows only the live nodes and the team. */
 @Composable
 fun DashboardTab(s: DashState, rrtOfficer: Boolean) = TabPage(s) { d ->
     val u = d.getJSONObject("unit"); val sm = d.getJSONObject("summary")
