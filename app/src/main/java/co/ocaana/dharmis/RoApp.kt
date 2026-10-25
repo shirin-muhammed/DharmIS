@@ -39,23 +39,23 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** The Range Officer app, drawn exactly as the Figma page "v4 · RO command". Always dark, whatever the phone theme. */
+/** The Range Officer app, drawn exactly as the Figma page "v4 · RO command". Follows the Appearance choice in Me (Auto, Light or Dark). */
 private object V4 {
-    val bg @Composable get() = Color(0xFF09241B)
-    val surf @Composable get() = Color(0xFF0F3125)
-    val surf2 @Composable get() = Color(0xFF16402F)
-    val line @Composable get() = Color(0xFF21503C)
-    val text @Composable get() = Color(0xFFEAF6F0)
-    val mute @Composable get() = Color(0xFF8FB5A4)
-    val acc @Composable get() = Color(0xFF2EE6C5)
-    val onAcc @Composable get() = Color(0xFF09241B)
-    val high @Composable get() = Color(0xFFFF6B5B)
-    val med @Composable get() = Color(0xFFFFB347)
-    val ok @Composable get() = Color(0xFF4ADE80)
-    val off @Composable get() = Color(0xFF7F968C)
-    val heroRed @Composable get() = Color(0xFF3A1A17)
-    val heroText @Composable get() = Color(0xFFF3CFC9)
-    val heroAmber @Composable get() = Color(0xFF33260F)
+    val bg @Composable get() = if (pal.dark) Color(0xFF09241B) else Color(0xFFF5F1E8)
+    val surf @Composable get() = if (pal.dark) Color(0xFF0F3125) else Color(0xFFFFFFFF)
+    val surf2 @Composable get() = if (pal.dark) Color(0xFF16402F) else Color(0xFFECE6D8)
+    val line @Composable get() = if (pal.dark) Color(0xFF21503C) else Color(0xFFDDD5C3)
+    val text @Composable get() = if (pal.dark) Color(0xFFEAF6F0) else Color(0xFF17261E)
+    val mute @Composable get() = if (pal.dark) Color(0xFF8FB5A4) else Color(0xFF6C7A72)
+    val acc @Composable get() = if (pal.dark) Color(0xFF2EE6C5) else Color(0xFF1D5A43)
+    val onAcc @Composable get() = if (pal.dark) Color(0xFF09241B) else Color.White
+    val high @Composable get() = if (pal.dark) Color(0xFFFF6B5B) else Color(0xFFC4301F)
+    val med @Composable get() = if (pal.dark) Color(0xFFFFB347) else Color(0xFFA86500)
+    val ok @Composable get() = if (pal.dark) Color(0xFF4ADE80) else Color(0xFF1D7A3E)
+    val off @Composable get() = if (pal.dark) Color(0xFF7F968C) else Color(0xFF6C7A72)
+    val heroRed @Composable get() = if (pal.dark) Color(0xFF3A1A17) else Color(0xFFFBE3DD)
+    val heroText @Composable get() = if (pal.dark) Color(0xFFF3CFC9) else Color(0xFF7A2418)
+    val heroAmber @Composable get() = if (pal.dark) Color(0xFF33260F) else Color(0xFFFBECC8)
 }
 
 private sealed class Sc {
@@ -673,6 +673,14 @@ private fun Me(ro: Ro) {
                 }
                 Spacer(Modifier.height(8.dp))
                 X("${p.range.division} · ${p.range.circle}", 12, FontWeight.Medium, V4.mute)
+            }
+            val mode by Store.themeMode
+            Surf(Modifier.fillMaxWidth()) {
+                X("Appearance", 13, FontWeight.SemiBold, V4.mute)
+                Spacer(Modifier.height(8.dp))
+                Segmented(listOf("Auto", "Light", "Dark"), mode) { Store.setTheme(it) }
+                Spacer(Modifier.height(8.dp))
+                X("Auto turns dark at sunset and light at sunrise for your station.", 12, FontWeight.Medium, V4.mute)
             }
             X("Your personal dashboard. No duty status and no alerts here.", 12, FontWeight.Medium, V4.mute)
             if (p != null && p.range.phone.isNotBlank()) Surf(Modifier.fillMaxWidth(), click = { dial(ctx, p.range.phone) }) {
