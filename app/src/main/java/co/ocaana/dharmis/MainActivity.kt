@@ -108,7 +108,13 @@ fun App() {
         var go by remember { mutableStateOf<Alert?>(null) }
         var sentId by remember { mutableStateOf<String?>(null) }
         // GPS runs only while a report or the Go map is open.
-        val needsLoc = chat != null || go != null
+        // ...and while this person is accepted or on the way to an alert; position goes to the control room every 30 s until they reach the spot.
+        val onTheWay = Store.alerts.firstOrNull { it.mine == "accepted" || it.mine == "on_the_way" }
+        val needsLoc = chat != null || go != null || onTheWay != null
+        LaunchedEffect(onTheWay?.node, onTheWay?.mine) {
+            val a = onTheWay ?: return@LaunchedEffect
+            while (true) { Loc.fresh()?.let { Api.respond(a.node, a.mine, it.latitude, it.longitude) }; kotlinx.coroutines.delay(30_000) }
+        }
         LaunchedEffect(needsLoc) { if (needsLoc) askLocation(false) else Loc.stop(ctx) }
         UpdateDialog(ctx)
         when {

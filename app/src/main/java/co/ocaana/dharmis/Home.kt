@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -191,12 +193,36 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                                 Icon(Icons.Rounded.Edit, null, tint = Color.White, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); T("Report now", 17, FontWeight.Bold, Color.White)
                             }
                         }
+                        Spacer(Modifier.height(12.dp))
+                        Respond(a, lc)
                     }
                 }
             }
         }
     }
 }
+
+private val STEP = mapOf("" to ("Accept" to "accepted"), "accepted" to ("On the way" to "on_the_way"), "on_the_way" to ("Reached" to "reached"), "reached" to ("Finish" to "done"))
+
+/** Accepted, On the way, Reached, Finish: the one next step as a button, and who else is responding. Position is shared only while accepted or on the way. */
+@Composable
+private fun Respond(a: Alert, lc: LevelColors) {
+    val mine = a.mine
+    val (label, next) = STEP[mine] ?: return
+    var busy by remember(a.node, mine) { mutableStateOf(false) }
+    val others = a.resp.filter { !it.mine }
+    if (others.isNotEmpty()) T(others.joinToString(" · ") { it.who.substringBefore(" ") + " " + stateWord(it.state) }, 13, FontWeight.SemiBold, lc.on, lh = 18)
+    else if (mine.isEmpty()) T("Nobody has accepted yet", 13, FontWeight.SemiBold, lc.on, lh = 18)
+    Spacer(Modifier.height(8.dp))
+    Row(Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(if (next == "done") Color.Transparent else lc.on).border(BorderStroke(2.dp, lc.on), RoundedCornerShape(26.dp))
+        .clickable(enabled = !busy) { busy = true; val l = if (next == "accepted" || next == "on_the_way") Loc.fresh() else null; Api.respond(a.node, next, l?.latitude, l?.longitude) },
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        T(if (busy) "Sending…" else label, 16, FontWeight.Bold, if (next == "done") lc.on else lc.main)
+    }
+    if (mine == "accepted" || mine == "on_the_way") T("Your position is shared with the control room until you reach the spot.", 11, FontWeight.Medium, lc.on, lh = 15)
+}
+
+fun stateWord(s: String) = when (s) { "accepted" -> "accepted"; "on_the_way" -> "is on the way"; "reached" -> "has reached"; else -> s }
 
 @Composable
 private fun Reports(onOpen: (String) -> Unit) {

@@ -72,6 +72,7 @@ private class Ro(val d: JSONObject, val push: (Sc) -> Unit, val tab: (String) ->
     val kids = d.getJSONArray("children").l()
     val people = d.getJSONArray("people").l()
     val reports = d.getJSONArray("reports").l()
+    val resp = d.optJSONArray("resp")?.l() ?: emptyList()
     val sum: JSONObject = d.getJSONObject("summary")
     val rangeName: String = d.getJSONObject("unit").getString("name")
     val now: Long = d.optLong("now", System.currentTimeMillis() / 1000)
@@ -87,6 +88,8 @@ private fun lw(l: String) = when (l) { "high" -> "High"; "medium" -> "Medium"; "
 private fun hhmm(sec: Long) = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(sec * 1000))
 private fun herdText(r: JSONObject) = when (val h = r.getInt("herd")) { 0 -> "no elephants"; 1 -> "1 elephant"; else -> "$h elephants" }
 private fun reportLine(r: JSONObject): String = listOf(r.s("seen"), herdText(r), r.s("note")).filter { it.isNotBlank() }.joinToString(", ")
+private fun stepWord(s: String) = when (s) { "accepted" -> "Accepted"; "on_the_way" -> "On the way"; "reached" -> "Reached"; else -> s }
+private fun openMap(ctx: Context, lat: Double, lon: Double, label: String) { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon(${Uri.encode(label)})")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 private fun postWord(p: String) = when (p) {
     "watcher" -> "Forest Watcher"; "rrt" -> "RRT Member"; "beat" -> "Beat Forest Officer"; "section" -> "Section Forest Officer"
     "dro" -> "Deputy Range Officer"; "range" -> "Range Officer"; "office" -> "Office Phone"; else -> p
@@ -304,6 +307,8 @@ private fun Command(ro: Ro) {
                     X(listOf(w.s("place"), office).filter { it.isNotBlank() }.joinToString(" · "), 13, FontWeight.Medium, V4.heroText)
                     val t = ro.sec(w)
                     X((if (t != null) "Last signal ${hhmm(t)}. " else "") + (if (rep != null) "${rep.s("by")} saw ${herdText(rep)} at ${hhmm(rep.getLong("at"))}." else ""), 13, FontWeight.Medium, V4.heroText)
+                    val rs = ro.resp.filter { it.getString("node") == w.getString("id") }
+                    X(if (rs.isEmpty()) "Nobody has accepted yet." else rs.joinToString(" · ") { it.s("name").substringBefore(" ") + " " + stepWord(it.s("state")).lowercase() }, 13, FontWeight.Bold, V4.heroText)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (phone.isNotBlank()) PBtn("Call station", V4.high, Color.White, Modifier.weight(1f), Icons.Rounded.Call) { dial(ctx, phone) }
@@ -440,6 +445,12 @@ private fun Today(ro: Ro) {
             val (lab, col) = when (lv) { "high" -> "HIGH ALERT" to "high"; "medium" -> "MEDIUM" to "medium"; "offline" -> "NO SIGNAL" to "off"; else -> "BACK TO ${lw(lv).uppercase()}" to "low" }
             l.add(Ev(e.getLong("at"), lab, col, if (lv == "offline") "$id stopped reporting" else "$id is ${lw(lv)}", sub(place[id] ?: "", e.s("office")), e.s("office"), Sc.Alert(id)))
         }
+        ro.resp.forEach { r ->
+            val who = r.s("name"); val node = r.getString("node"); val off = r.s("office")
+            listOf("acc" to "accepted", "way" to "is on the way to", "reached" to "reached").forEach { (k, w) ->
+                if (!r.isNull(k)) l.add(Ev(r.getLong(k), "RRT", "acc", "$who $w $node", off, off, Sc.Alert(node)))
+            }
+        }
         // nodes already at High or Medium before the first recorded change still belong on the list
         ro.nodes.filter { n -> (n.getString("level") == "high" || n.getString("level") == "medium") && ev.none { it.getString("node") == n.getString("id") } }.forEach { n ->
             val lv = n.getString("level"); val t = if (n.isNull("since")) ro.sec(n) else n.getLong("since")
@@ -472,18 +483,21 @@ private fun Today(ro: Ro) {
 @Composable
 private fun People(ro: Ro) {
     var seg by remember { mutableIntStateOf(0) }
-    val duty = ro.people.filter { it.optBoolean("duty", true) }
+    var team by remember { mutableIntStateOf(0) }   // 0 stations, 1 the RRT units
+    val all = ro.people.filter { it.optBoolean("rrt") == (team == 1) }
+    val duty = all.filter { it.optBoolean("duty", true) }
     val on = duty.count { it.getBoolean("on_duty") }
-    val list = ro.people.filter { p -> val d = p.optBoolean("duty", true); when (seg) { 0 -> d && p.getBoolean("on_duty"); 1 -> d && !p.getBoolean("on_duty"); else -> true } }
+    val list = all.filter { p -> val d = p.optBoolean("duty", true); when (seg) { 0 -> d && p.getBoolean("on_duty"); 1 -> d && !p.getBoolean("on_duty"); else -> true } }
     val groups = list.groupBy { it.s("office").ifBlank { ro.rangeName } }
     Column(Modifier.fillMaxSize()) {
         TopBrand()
         Body {
             Column { X("People", 28, FontWeight.ExtraBold); X("$on on duty · ${duty.size - on} off duty", 13, FontWeight.Medium, V4.mute) }
+            Segmented(listOf("Stations", "RRT"), team) { team = it }
             Segmented(listOf("On duty", "Off duty", "All"), seg) { seg = it }
             if (list.isEmpty()) Surf(Modifier.fillMaxWidth(), border = V4.med) {
                 X("Nobody is on duty", 18, FontWeight.ExtraBold, V4.med)
-                X(if (seg == 0) "No one in ${ro.rangeName} has gone on duty. Call the station offices." else "Nothing to show here.", 13, FontWeight.Medium, V4.mute)
+                X(if (seg == 0) (if (team == 1) "No RRT member is on duty. Call the RRT unit office." else "No one in ${ro.rangeName} has gone on duty. Call the station offices.") else "Nothing to show here.", 13, FontWeight.Medium, V4.mute)
             }
             groups.forEach { (office, ps) ->
                 val d = ps.filter { it.optBoolean("duty", true) }; val o = d.count { it.getBoolean("on_duty") }
@@ -568,6 +582,24 @@ private fun AlertScreen(ro: Ro, id: String, back: () -> Unit) {
                             if (sn != null) X("${lw(l)} since ${hhmm(sn)}", 12, FontWeight.Medium, V4.mute)
                         }
                     } else X(if (tried) "The signal strip is not available yet." else "Loading…", 13, FontWeight.Medium, V4.mute)
+                }
+                val rs = ro.resp.filter { it.getString("node") == id }
+                if (rs.isNotEmpty() || l == "high") {
+                    X("Responding", 15, FontWeight.Bold)
+                    if (rs.isEmpty()) Surf(Modifier.fillMaxWidth(), border = V4.high) { X("Nobody has accepted yet", 14, FontWeight.Bold, V4.high); X("The station and you are reminded after 3 and 6 minutes.", 12, FontWeight.Medium, V4.mute) }
+                    rs.forEach { r ->
+                        val lat = if (r.isNull("lat")) null else r.getDouble("lat"); val lon = if (r.isNull("lon")) null else r.getDouble("lon")
+                        Surf(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Av(r.s("name"), 40); Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) { X(r.s("name"), 14, FontWeight.SemiBold); X(postWord(r.s("post")) + " · " + stepWord(r.s("state")), 12, FontWeight.Bold, V4.ok) }
+                                CallBtn(r.getString("phone"), true)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            X("Accepted ${hhmm(r.getLong("acc"))}" + (if (!r.isNull("way")) " · On the way ${hhmm(r.getLong("way"))}" else "") + (if (!r.isNull("reached")) " · Reached ${hhmm(r.getLong("reached"))}" else ""), 12, FontWeight.Medium, V4.mute)
+                            if (lat != null && lon != null) { Spacer(Modifier.height(8.dp)); PBtn("Show on map · ${hhmm(r.getLong("pos"))}", null, V4.text, Modifier.fillMaxWidth(), Icons.Rounded.Place, 44) { openMap(ctx, lat, lon, r.s("name")) } }
+                        }
+                    }
                 }
                 X("What happened", 15, FontWeight.Bold)
                 if (reps.isEmpty() && t == null) X("Nothing recorded for this node yet.", 13, FontWeight.Medium, V4.mute)

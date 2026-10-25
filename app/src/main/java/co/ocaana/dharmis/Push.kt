@@ -9,8 +9,13 @@ class Push : FirebaseMessagingService() {
         val d = m.data
         val node = d["node"] ?: return
         Store.init(applicationContext)
-        if (!Store.onDuty.value) return
         Notify.channels(applicationContext)
+        if (d["esc"] != null) {   // nobody has answered a High alert: station first, then the range officer
+            if (Store.alertUser && !Store.onDuty.value) return
+            Notify.escalation(applicationContext, node, d["place"] ?: "", d["esc"] ?: "", d["mins"] ?: "")
+            return
+        }
+        if (!Store.onDuty.value) return
         Notify.push(applicationContext, Alert(node, d["place"] ?: "", (d["level"] ?: "HIGH").uppercase(), System.currentTimeMillis(),
             d["lat"]?.toDoubleOrNull() ?: Double.NaN, d["lon"]?.toDoubleOrNull() ?: Double.NaN))
     }

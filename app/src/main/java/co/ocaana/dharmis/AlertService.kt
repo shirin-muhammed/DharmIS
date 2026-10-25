@@ -75,6 +75,18 @@ object Notify {
         nm.notify(a.node.hashCode(), b.build())
     }
 
+    /** Nobody has accepted a High alert for a few minutes. Station phones get the siren again; the range officer a normal notification. */
+    fun escalation(ctx: Context, node: String, place: String, to: String, mins: String) {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        val text = "Nobody has accepted the High alert" + (if (place.isNotBlank()) " at $place" else "") + (if (mins.isNotBlank()) " for $mins min" else "")
+        val station = to == "station"
+        val b = NotificationCompat.Builder(ctx, if (station) SIREN else MEDIUM).setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(node).setContentText(text).setAutoCancel(true).setContentIntent(open(ctx))
+        if (station) b.setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX).setSound(Uri.parse("android.resource://${ctx.packageName}/${R.raw.siren}"))
+        else b.setPriority(NotificationCompat.PRIORITY_DEFAULT).setDefaults(NotificationCompat.DEFAULT_SOUND)
+        nm.notify(("esc" + node).hashCode(), b.build())
+    }
+
     fun forget() { sounded.clear() }
 }
 

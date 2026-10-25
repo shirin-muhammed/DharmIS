@@ -87,6 +87,17 @@ object Api {
         }
     }
 
+    /** Accepted, on_the_way, reached or done on one alert. lat and lon are sent only while accepted or on the way. */
+    fun respond(node: String, state: String, lat: Double? = null, lon: Double? = null, done: () -> Unit = {}) {
+        thread {
+            val b = JSONObject().put("node", node).put("state", state)
+            if (lat != null && lon != null) b.put("lat", lat).put("lon", lon)
+            call("respond", b)
+            main.post { done() }
+            poll()
+        }
+    }
+
     /** Signal strip of one node for the last hour (RO alert detail). Null when the server is older or the node is out of reach. */
     fun node(id: String, done: (JSONObject?) -> Unit) {
         thread {
@@ -118,7 +129,7 @@ object Api {
             try {
                 if (Store.token.isBlank()) return@thread
                 val duty = Store.onDuty.value
-                if (Store.alertUser) sendPushToken()
+                sendPushToken()   // officers get the escalation notices too, so every login registers
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
                 if (r != null && r.json.has("receives")) { val rv = r.json.optBoolean("receives", true); main.post { Store.receives.value = rv } }
@@ -134,8 +145,10 @@ object Api {
                 val list = r.json.optJSONArray("alerts")
                 val alerts = List(list?.length() ?: 0) { i ->
                     val a = list!!.getJSONObject(i)
+                    val rs = a.optJSONArray("resp")
                     Alert(a.getString("node"), a.optString("place"), a.getString("level").uppercase(), now - a.optLong("age") * 1000,
-                        if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"))
+                        if (a.isNull("lat")) Double.NaN else a.getDouble("lat"), if (a.isNull("lon")) Double.NaN else a.getDouble("lon"),
+                        List(rs?.length() ?: 0) { j -> rs!!.getJSONObject(j).let { Resp(it.optString("who"), it.optString("state"), it.optLong("at") * 1000, it.optBoolean("mine")) } })
                 }
                 main.post { Store.serverStatus.value = status; Store.online.value = true; Store.lastOk.value = System.currentTimeMillis(); Store.alerts.clear(); Store.alerts.addAll(alerts) }
                 if (Store.onDuty.value && Store.alertUser) Notify.check(Store.app, alerts)

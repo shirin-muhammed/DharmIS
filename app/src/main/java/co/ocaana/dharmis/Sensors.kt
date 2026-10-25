@@ -14,8 +14,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 
 /** lat and lon are NaN when the node has no place recorded yet. */
-class Alert(val node: String, val place: String, val level: String, val since: Long, val lat: Double, val lon: Double) {
+class Resp(val who: String, val state: String, val at: Long, val mine: Boolean)
+
+class Alert(val node: String, val place: String, val level: String, val since: Long, val lat: Double, val lon: Double, val resp: List<Resp> = emptyList()) {
     val hasPos get() = !lat.isNaN() && !lon.isNaN()
+    /** My own step on this alert: "", accepted, on_the_way or reached. */
+    val mine get() = resp.firstOrNull { it.mine }?.state ?: ""
 }
 
 
