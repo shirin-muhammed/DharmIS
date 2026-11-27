@@ -74,9 +74,11 @@ object Store {
         themeMode.value = sp.getInt("theme", 0)
         sp.getString("profile", null)?.let { s ->
             val o = JSONObject(s)
-            Directory.ranges.firstOrNull { it.name == o.getString("range") }?.let {
-                profile.value = Profile(o.getString("name"), o.getString("phone"), o.optString("role"), o.getString("station"), it)
-            }
+            // Officers set up by staff may have an office missing from the app's list; rebuild it as log in does, or they look signed out after a restart.
+            val office = Directory.ranges.firstOrNull { it.name == o.getString("range") && it.division == o.optString("division") }
+                ?: Directory.ranges.firstOrNull { it.name == o.getString("range") }
+                ?: RangeOffice(o.getString("range"), "", emptyList(), o.optString("division"), o.optString("circle"))
+            profile.value = Profile(o.getString("name"), o.getString("phone"), o.optString("role"), o.getString("station"), office)
         }
         if (file.exists()) {
             val a = JSONArray(file.readText())
@@ -86,7 +88,7 @@ object Store {
 
     fun saveProfile(p: Profile) {
         profile.value = p
-        sp.edit().putString("profile", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station).put("range", p.range.name).toString()).apply()
+        sp.edit().putString("profile", JSONObject().put("name", p.name).put("phone", p.phone).put("role", p.role).put("station", p.station).put("range", p.range.name).put("division", p.range.division).put("circle", p.range.circle).toString()).apply()
     }
 
     fun setDuty(on: Boolean) {
