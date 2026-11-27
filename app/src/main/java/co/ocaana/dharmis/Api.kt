@@ -133,6 +133,7 @@ object Api {
                 var r = call("alerts")
                 if (r != null && r.code == 401) { main.post { Store.signedOut() }; return@thread }
                 if (r != null && r.json.has("receives")) { val rv = r.json.optBoolean("receives", true); main.post { Store.receives.value = rv } }
+                if (r != null && r.json.has("nodes")) { val nc = r.json.optInt("nodes", -1); val no = r.json.optInt("offline", 0); main.post { Store.nodeCount.value = nc; Store.nodesOffline.value = no } }
                 if (r != null && r.json.has("in_rrt")) { val iv = r.json.optBoolean("in_rrt"); main.post { Store.inRrt.value = iv } }
                 if (r != null && r.json.has("rank")) { val rk = r.json.optString("rank"); main.post { Store.setRank(rk) } }
                 if (Store.alertUser && r != null && r.json.has("on_duty") && r.json.optBoolean("on_duty") != duty) {
