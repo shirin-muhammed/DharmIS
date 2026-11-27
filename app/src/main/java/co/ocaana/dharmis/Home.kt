@@ -167,11 +167,13 @@ private fun Alerts(onReport: (Alert) -> Unit, onGo: (Alert) -> Unit) {
                     T("Please call your range office.", 14, FontWeight.Medium, pal.ink2)
                 }
                 alerts.isEmpty() -> Card(Modifier.fillMaxWidth(), pad = 24.dp) {
-                    Icon(if (online) Icons.Rounded.CheckCircle else Icons.Rounded.CloudOff, null, tint = pal.ink3, modifier = Modifier.size(36.dp))
+                    val nc = Store.nodeCount.value
+                    val noNodes = online && (nc == 0 || nc < 0 && Store.rank.value == "office")   // nothing is watched: never say "No alerts"
+                    val allOff = online && nc > 0 && Store.nodesOffline.value >= nc
+                    Icon(if (noNodes || allOff) Icons.Rounded.SensorsOff else if (online) Icons.Rounded.CheckCircle else Icons.Rounded.CloudOff, null, tint = if (noNodes || allOff) pal.amb else pal.ink3, modifier = Modifier.size(36.dp))
                     Spacer(Modifier.height(10.dp))
-                    val noNodes = online && Store.rank.value == "office"
-                    T(if (noNodes) "No nodes assigned to your office yet" else if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
-                    T(if (noNodes) "Ask your control room." else if (online) "All your nodes are quiet. You are alerted when a node reaches High." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
+                    T(if (noNodes) "No node connected" else if (allOff) "Your nodes are offline" else if (online) "No alerts" else "Cannot reach the control room", 20, FontWeight.ExtraBold)
+                    T(if (noNodes) "No sensor is connected to your office, so nothing is being watched. Ask your control room." else if (allOff) "No node has reported for several minutes, so nothing is being watched. Ask your control room." else if (online) "All your nodes are quiet. You are alerted when a node reaches High." else "Check your signal. This page checks again every few seconds.", 14, FontWeight.Medium, pal.ink2)
                     val ok = Store.lastOk.value
                     if (ok > 0) T("Last checked " + SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date(ok)), 12, FontWeight.Bold, pal.ink3)
                 }

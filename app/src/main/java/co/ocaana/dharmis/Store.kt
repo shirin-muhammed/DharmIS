@@ -37,6 +37,8 @@ object Store {
     /** False for a watcher or beat officer posted at a station or section: alerts go to the RRT team and office phones only. */
     val receives = mutableStateOf(true)
     val isOfficer get() = rank.value in setOf("section", "dro", "range")
+    val nodeCount = mutableStateOf(-1)   // nodes in this phone's scope (-1 = older server that does not say)
+    val nodesOffline = mutableStateOf(0)
     val inRrt = mutableStateOf(false)   // an officer who is also in the RRT unit gets the alert screens too
     val alertUser get() = !isOfficer || inRrt.value
     fun setRank(r: String) { if (r.isNotBlank() && r != rank.value) { rank.value = r; sp.edit().putString("rank", r).apply() } }
