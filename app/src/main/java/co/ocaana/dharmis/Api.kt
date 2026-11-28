@@ -72,8 +72,7 @@ object Api {
             if (r == null || r.code != 200 || m == null || t.isBlank()) { main.post { done(failText(r)) }; return@thread }
             val range = Directory.ranges.firstOrNull { it.name == m.optString("range") && it.division == m.optString("division") } ?: Directory.ranges.firstOrNull { it.name == m.optString("range") }
             val rank = m.optString("rank", "rrt")
-            val office = range ?: if (rank in setOf("section", "dro", "range")) RangeOffice(m.optString("range"), "", emptyList(), m.optString("division"), m.optString("circle")) else null   // officers are set up by staff and may not be in the registration list
-            if (office == null) { main.post { done("Your range office is not in this app's list. Call your control room.") }; return@thread }
+            val office = range ?: RangeOffice(m.optString("range"), "", emptyList(), m.optString("division"), m.optString("circle"))   // offices built under Users may not be in the app's list; the server already approved this member
             main.post { Store.setRank(rank); Store.setToken(t); Store.saveProfile(Profile(m.optString("name"), m.optString("phone"), m.optString("role"), m.optString("station"), office)); done(null) }
         }
     }
