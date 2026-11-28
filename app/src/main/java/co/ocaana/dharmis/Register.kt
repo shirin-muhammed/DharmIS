@@ -231,7 +231,7 @@ fun Login(onBack: () -> Unit, onDone: () -> Unit) {
                 T("Log in", 30, FontWeight.ExtraBold, lh = 36)
                 T("Use the mobile number and PIN you registered with.", 15, FontWeight.Medium, pal.ink2, lh = 22)
             }
-            Column(Modifier.fillMaxWidth()) { Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10) } }
+            Column(Modifier.fillMaxWidth()) { Field("Mobile number", phone, "10-digit number", KeyboardType.Phone) { phone = it.filter(Char::isDigit).take(10); error = ""; if (phone.length == 10 && pin.length == 4 && !busy) go() } }   // PIN typed first: log in as soon as the number is complete
             T("PIN", 14, Bold, pal.ink2, Modifier.fillMaxWidth())
             PinDots(pin, error.isNotEmpty())
             if (error.isNotEmpty()) T(error, 14, Bold, pal.red)
